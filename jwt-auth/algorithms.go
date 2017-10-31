@@ -1,6 +1,6 @@
 package jwt_auth
 
-import "tool/encoder"
+import "github.com/imkuqin-zw/tool/encoder"
 
 type Algorithms struct{}
 

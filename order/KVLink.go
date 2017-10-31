@@ -140,8 +140,8 @@ func (kv *KVLinkHead) GetFirst() (interface{}, interface{}, error) {
 
 func (kv *KVLinkHead) GetAllKV() ([]string, []interface{}) {
 	temp := kv.first
-	keys := make([]string, kv.count)
-	vals := make([]interface{}, kv.count)
+	keys := make([]string, 0,  kv.count)
+	vals := make([]interface{}, 0, kv.count)
 	for i := 0; i < kv.count; i++ {
 		keys = append(keys, temp.key)
 		vals = append(vals, temp.val)

@@ -29,6 +29,11 @@ func (kv *KVMap) Get(k string) (interface{}, bool) {
 	return v, ok
 }
 
+func (kv *KVMap) ExistKey(k string) (bool) {
+	_, ok := kv.hash[k]
+	return ok
+}
+
 func (kv *KVMap) Keys() ([]string) {
 	return kv.keys
 }

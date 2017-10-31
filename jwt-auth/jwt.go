@@ -6,7 +6,7 @@ import (
 	"reflect"
 	"strings"
 	"time"
-	"tool/encoder"
+	"github.com/imkuqin-zw/tool/encoder"
 )
 
 var (
