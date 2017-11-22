@@ -1,4 +1,4 @@
-package Excel
+package excel
 
 import (
 	"time"
