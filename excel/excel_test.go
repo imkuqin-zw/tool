@@ -21,6 +21,18 @@ type StructTest struct {
 	Time2	   *Children `excel:"cellName(struct)"`
 }
 
+func TestCreateHeadByStruct(t *testing.T) {
+	file, err := CreateHeadByStruct(new(StructTest), "test")
+	if err != nil {
+		fmt.Println(err.Error())
+		return
+	}
+	err = file.Save("MyXLSXFile.xlsx")
+	if err != nil {
+		fmt.Printf(err.Error())
+	}
+}
+
 func TestCreateByStructs(t *testing.T) {
 	test := []StructTest{
 		StructTest{

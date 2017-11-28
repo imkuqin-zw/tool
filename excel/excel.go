@@ -36,6 +36,18 @@ func CreateByKVMapStructs(data *order.KVMap) (err error, file *xlsx.File) {
 	return
 }
 
+func CreateHeadByStruct(m interface{}, key string) (file *xlsx.File, err error) {
+	file = xlsx.NewFile()
+	sheet, err := file.AddSheet(key)
+	if err != nil {
+		return
+	}
+	t := reflect.TypeOf(m)
+	row := sheet.AddRow()
+	err , _ = createRowHeaderBystructs(row, t)
+	return
+}
+
 func CreateByKVMapInterface(data *order.KVMap) (err error, file *xlsx.File) {
 	file = xlsx.NewFile()
 	data.SortAsc()
