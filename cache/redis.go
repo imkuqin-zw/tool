@@ -19,7 +19,7 @@ var DeadLockErr = fmt.Errorf("[Redis] dead lock")
 var NotClose = fmt.Errorf("[Redis] not close")
 
 type RedisConfig struct {
-	MaxIdel 	int
+	MaxIdle 	int
 	MaxActive 	int
 	IdleTimeOut time.Duration
 }
@@ -31,13 +31,13 @@ func Register(ip string, config *RedisConfig) {
 	}
 	if config == nil {
 		config = &RedisConfig{
-			MaxIdel: 80,
+			MaxIdle: 80,
 			MaxActive: 12000,
 			IdleTimeOut: 180 * time.Second,
 		}
 	}
 	redisPool[ip] = &redis.Pool{
-		MaxIdle: config.MaxIdel,
+		MaxIdle: config.MaxIdle,
 		MaxActive: config.MaxActive,
 		IdleTimeout: config.IdleTimeOut,
 		Dial: func() (redis.Conn, error) {
