@@ -9,7 +9,6 @@ import (
 type RedisConn struct {
 	conn redis.Conn
 	prefix string
-	config
 }
 
 var redisPool map[string]*redis.Pool
