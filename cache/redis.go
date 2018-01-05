@@ -103,25 +103,25 @@ func (r *RedisConn) Del(key string) (err error) {
 	return
 }
 
-func (r *RedisConn) RPUSH(key string, val interface{}) (err error) {
+func (r *RedisConn) RPush(key string, val interface{}) (err error) {
 	key = r.prefix + key
 	_, err = r.conn.Do("RPUSH", key, val)
 	return
 }
 
-func (r *RedisConn) LPUSH(key string, val interface{}) (err error) {
+func (r *RedisConn) LPush(key string, val interface{}) (err error) {
 	key = r.prefix + key
 	_, err = r.conn.Do("LPUSH", key, val)
 	return
 }
 
-func (r *RedisConn) LPOP(key string, val interface{}) (value interface{}, err error) {
+func (r *RedisConn) LPop(key string, val interface{}) (value interface{}, err error) {
 	key = r.prefix + key
 	value, err = r.conn.Do("LPOP", key)
 	return
 }
 
-func (r *RedisConn) RPOP(key string, val interface{}) (value interface{}, err error) {
+func (r *RedisConn) RPop(key string, val interface{}) (value interface{}, err error) {
 	key = r.prefix + key
 	value, err = r.conn.Do("RPOP", key)
 	return
