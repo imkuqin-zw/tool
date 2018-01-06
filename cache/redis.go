@@ -13,6 +13,7 @@ type RedisConn struct {
 
 var redisPool map[string]*redis.Pool
 var defaultIp string
+
 var NoIpErr = fmt.Errorf("[Redis] ip not register")
 var NoDefaultErr = fmt.Errorf("[Redis] default not register")
 var DeadLockErr = fmt.Errorf("[Redis] dead lock")
@@ -124,6 +125,13 @@ func (r *RedisConn) LPop(key string, val interface{}) (value interface{}, err er
 func (r *RedisConn) RPop(key string, val interface{}) (value interface{}, err error) {
 	key = r.prefix + key
 	value, err = r.conn.Do("RPOP", key)
+	return
+}
+
+func (r *RedisConn) Do(command, key string, params ...interface{}) (value interface{}, err error) {
+	val := []interface{}{r.prefix + key}
+	val = append(val, params...)
+	value, err = r.conn.Do(command, val...)
 	return
 }
 
