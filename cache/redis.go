@@ -25,7 +25,7 @@ type RedisConfig struct {
 	IdleTimeOut time.Duration
 }
 
-func Register(ip string, config *RedisConfig) {
+func RegisterRedis(ip string, config *RedisConfig) {
 	_, ok := redisPool[ip]
 	if ok {
 		return
@@ -46,10 +46,13 @@ func Register(ip string, config *RedisConfig) {
 			return c, err
 		},
 	}
+	if len(redisPool) == 1 {
+		defaultIp = ip
+	}
 	return
 }
 
-func RegisterDefault(ip string) error {
+func SetDefaultRedis(ip string) error {
 	_, ok := redisPool[ip]
 	if !ok {
 		return NoIpErr
@@ -58,7 +61,7 @@ func RegisterDefault(ip string) error {
 	return nil
 }
 
-func GetConn(config ...string) (redisConn *RedisConn, err error) {
+func GetRedisConn(config ...string) (redisConn *RedisConn, err error) {
 	if defaultIp == "" {
 		err = NoDefaultErr
 		return
@@ -94,7 +97,37 @@ func (r *RedisConn) Get(key string) (value interface{}, err error) {
 
 func (r *RedisConn) Set(key string, val interface{}, expire int) (err error) {
 	key = r.prefix + key
-	_, err = r.conn.Do("SET", key, val, expire)
+	_, err = r.conn.Do("SET", key, val)
+	if err != nil {
+		return
+	}
+	if expire != 0 {
+		_, err = r.conn.Do("EXPIRE", key, expire)
+	}
+	return
+}
+
+func (r *RedisConn) Exist(key string) (exist bool, err error) {
+	key = r.prefix + key
+	exist, err = redis.Bool(r.conn.Do("EXISTS", key))
+	return
+}
+
+func (r *RedisConn) Increment(key string) (val interface{}, err error) {
+	key = r.prefix + key
+	val, err = r.conn.Do("INCR", key)
+	return
+}
+
+func (r *RedisConn) SetNx(key string, val interface{}, expire int) (value bool, err error) {
+	key = r.prefix + key
+	val, err = redis.Bool(r.conn.Do("SETNX", key, val))
+	if err != nil {
+		return
+	}
+	if expire != 0 {
+		_, err = r.conn.Do("EXPIRE", key, expire)
+	}
 	return
 }
 

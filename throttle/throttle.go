@@ -6,10 +6,14 @@ import (
 	"github.com/imkuqin-zw/tool/encoder"
 	"strconv"
 	"time"
+	"github.com/astaxie/beego/logs"
 )
 
+type Throttle interface{
+	Handle() (bool, error)
+}
 
-type Throttle struct {
+type throttle struct {
 	catch CatchThrottle
 	maxAttempts int
 	decayMinutes int
@@ -17,43 +21,66 @@ type Throttle struct {
 	resp http.ResponseWriter
 }
 
-func NewThrottle(req *http.Request, resp http.ResponseWriter) *Throttle {
-	return &Throttle{
+func NewThrottle(req *http.Request, resp http.ResponseWriter, cache CatchThrottle, config ...int) Throttle {
+	instance := &throttle{
+		catch: cache,
 		req: req,
 		resp: resp,
 		maxAttempts: 60,
 		decayMinutes: 1,
 	}
+	if len(config) > 0 {
+		instance.maxAttempts = config[0]
+		if len(config) > 1 {
+			instance.decayMinutes = config[1]
+		}
+	}
+	return instance
 }
 
-func (t *Throttle) Handle() bool {
+func (t *throttle) Handle() (bool, error) {
 	sign := t.getRequestSign()
-	if t.tooManyAttempts(sign) {
+	tooMany, err := t.tooManyAttempts(sign)
+	if err != nil {
+		return false, err
+	}
+	if tooMany {
 		t.buildException(sign)
-		return false
+		return false, nil
 	}
 
 	t.catch.Hit(sign, t.decayMinutes)
-	t.AddHead(t.retriesLeft(sign, 0), 0)
-	return true
+	attempts, err := t.retriesLeft(sign, 0)
+	if err != nil {
+		return false, err
+	}
+	t.addHead(attempts, 0)
+	return true, nil
 }
 
-func (t *Throttle) buildException(sign string) {
-	retryAfter := t.catch.availableIn(sign)
-	remainingAttempts := t.retriesLeft(sign, retryAfter)
-	t.AddHead(remainingAttempts, retryAfter)
+func (t *throttle) buildException(sign string) (err error) {
+	retryAfter, err := t.catch.availableIn(sign)
+	if err != nil {
+		return
+	}
+	remainingAttempts, err := t.retriesLeft(sign, retryAfter)
+	if err != nil {
+		return
+	}
+	t.addHead(remainingAttempts, retryAfter)
+	return
 }
 
-func (t *Throttle) retriesLeft(sign string, retryAfter int) int {
+func (t *throttle) retriesLeft(sign string, retryAfter int) (int, error) {
 	if retryAfter == 0 {
-		attempts := t.catch.Attempts(sign)
-		return t.maxAttempts - attempts
+		attempts, err := t.catch.Attempts(sign)
+		return t.maxAttempts - attempts, err
 	} else {
-		return 0
+		return 0, nil
 	}
 }
 
-func (t *Throttle) AddHead(remainingAttempts, retryAfter int) {
+func (t *throttle) addHead(remainingAttempts, retryAfter int) {
 	t.resp.Header().Set("X-RateLimit-Limit", strconv.Itoa(t.maxAttempts))
 	t.resp.Header().Set("X-RateLimit-Remaining", strconv.Itoa(remainingAttempts))
 	if retryAfter != 0 {
@@ -65,7 +92,7 @@ func (t *Throttle) AddHead(remainingAttempts, retryAfter int) {
 	return
 }
 
-func (t *Throttle) getRequestSign() (sign string) {
+func (t *throttle) getRequestSign() (sign string) {
 	ip := strings.Split(t.req.RemoteAddr, ":")[0]
 	domain := strings.Replace(t.req.Host, "http://", "", -1)
 	domain = strings.Replace(domain, "https://", "", -1)
@@ -73,12 +100,20 @@ func (t *Throttle) getRequestSign() (sign string) {
 	return
 }
 
-func (t *Throttle) tooManyAttempts(sign string) bool {
-	if t.catch.Attempts(sign) > t.maxAttempts {
-		if t.catch.Has(sign + ":timer") {
-			return true
-		}
-		t.catch.resetAttempts(sign)
+func (t *throttle) tooManyAttempts(sign string) (bool, error) {
+	count, err := t.catch.Attempts(sign)
+	if err != nil {
+		return false, err
 	}
-	return false
+	if count > t.maxAttempts {
+		exist, err := t.catch.Has(sign + ":timer")
+		if  err != nil {
+			return false, err
+		}
+		if exist {
+			return true, nil
+		}
+		t.catch.ResetAttempts(sign)
+	}
+	return false, nil
 }
