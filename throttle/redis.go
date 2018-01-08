@@ -4,6 +4,7 @@ import (
 	"github.com/imkuqin-zw/tool/cache"
 	"github.com/garyburd/redigo/redis"
 	"time"
+	"fmt"
 )
 
 type redisCatch struct{
@@ -21,7 +22,7 @@ func (r redisCatch) Attempts(key string) (val int, err error) {
 		return
 	}
 	defer conn.Close()
-	val, err = redis.Int(conn.Get("key"))
+	val, err = redis.Int(conn.Get(key))
 	if err != nil && err == redis.ErrNil {
 		err = conn.Set(key, 0, 0)
 		return
@@ -49,25 +50,28 @@ func (r redisCatch) ResetAttempts(key string) (err error)  {
 	return
 }
 
-func (r redisCatch) Hit(key string, decayMinutes int) (hits int) {
+func (r redisCatch) Hit(key string, decayMinutes int) (hits int, err error) {
 	conn, err := cache.GetRedisConn(r.ip, r.prefix)
 	if err != nil {
 		return
 	}
 	defer conn.Close()
 	availableAt := int(time.Now().Unix()) + decayMinutes * 60
-	conn.SetNx(key + ":time", availableAt, decayMinutes * 60)
+	_, err = conn.SetNx(key + ":timer", availableAt, decayMinutes * 60)
 	if err != nil {
 		return
 	}
 	added, err := conn.SetNx(key, 0, decayMinutes * 60)
+	fmt.Println(added)
 	if err != nil {
 		return
 	}
+
 	hits, err = redis.Int(conn.Increment(key))
 	if err != nil {
 		return
 	}
+	fmt.Println(hits)
 	if !added && hits == 1 {
 		conn.Set(key, 1, decayMinutes * 60)
 	}

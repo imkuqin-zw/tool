@@ -11,7 +11,7 @@ type RedisConn struct {
 	prefix string
 }
 
-var redisPool map[string]*redis.Pool
+var redisPool = make(map[string]*redis.Pool, 1)
 var defaultIp string
 
 var NoIpErr = fmt.Errorf("[Redis] ip not register")
@@ -115,14 +115,15 @@ func (r *RedisConn) Exist(key string) (exist bool, err error) {
 
 func (r *RedisConn) Increment(key string) (val interface{}, err error) {
 	key = r.prefix + key
+	fmt.Println(key)
 	val, err = r.conn.Do("INCR", key)
 	return
 }
 
 func (r *RedisConn) SetNx(key string, val interface{}, expire int) (value bool, err error) {
 	key = r.prefix + key
-	val, err = redis.Bool(r.conn.Do("SETNX", key, val))
-	if err != nil {
+	notExist, err := redis.Bool(r.conn.Do("SETNX", key, val))
+	if err != nil || !notExist {
 		return
 	}
 	if expire != 0 {
@@ -171,7 +172,7 @@ func (r *RedisConn) Do(command, key string, params ...interface{}) (value interf
 func (r *RedisConn) Lock(key string) (err error) {
 	startTime := time.Now()
 	for {
-		_, err := r.Get(key)
+		_, err = r.Get(key)
 		if err != nil && err != redis.ErrNil {
 			return
 		}

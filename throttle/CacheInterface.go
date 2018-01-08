@@ -4,7 +4,7 @@ type CatchThrottle interface{
 	Attempts(key string) (int, error)
 	Has(key string) (bool, error)
 	ResetAttempts(key string) error
-	Hit(key string, decayMinutes int) int
+	Hit(key string, decayMinutes int) (int, error)
 	availableIn(key string) (int, error)
 }
 

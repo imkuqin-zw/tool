@@ -6,10 +6,10 @@ import (
 	"github.com/imkuqin-zw/tool/encoder"
 	"strconv"
 	"time"
-	"github.com/astaxie/beego/logs"
+	"fmt"
 )
 
-type Throttle interface{
+type Throttle interface {
 	Handle() (bool, error)
 }
 
@@ -40,6 +40,7 @@ func NewThrottle(req *http.Request, resp http.ResponseWriter, cache CatchThrottl
 
 func (t *throttle) Handle() (bool, error) {
 	sign := t.getRequestSign()
+	fmt.Println(sign)
 	tooMany, err := t.tooManyAttempts(sign)
 	if err != nil {
 		return false, err
@@ -49,7 +50,9 @@ func (t *throttle) Handle() (bool, error) {
 		return false, nil
 	}
 
-	t.catch.Hit(sign, t.decayMinutes)
+	if _, err = t.catch.Hit(sign, t.decayMinutes); err != nil {
+		return false, err
+	}
 	attempts, err := t.retriesLeft(sign, 0)
 	if err != nil {
 		return false, err
@@ -84,10 +87,10 @@ func (t *throttle) addHead(remainingAttempts, retryAfter int) {
 	t.resp.Header().Set("X-RateLimit-Limit", strconv.Itoa(t.maxAttempts))
 	t.resp.Header().Set("X-RateLimit-Remaining", strconv.Itoa(remainingAttempts))
 	if retryAfter != 0 {
-		t.resp.WriteHeader(http.StatusTooManyRequests)
 		t.resp.Header().Set("Retry-After", strconv.Itoa(retryAfter))
 		availableAt := int(time.Now().Unix()) + retryAfter
 		t.resp.Header().Set("X-RateLimit-Reset", strconv.Itoa(availableAt))
+		t.resp.WriteHeader(http.StatusTooManyRequests)
 	}
 	return
 }
@@ -105,7 +108,7 @@ func (t *throttle) tooManyAttempts(sign string) (bool, error) {
 	if err != nil {
 		return false, err
 	}
-	if count > t.maxAttempts {
+	if count >= t.maxAttempts {
 		exist, err := t.catch.Has(sign + ":timer")
 		if  err != nil {
 			return false, err
