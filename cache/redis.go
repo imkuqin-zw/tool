@@ -11,7 +11,7 @@ type RedisConn struct {
 	prefix string
 }
 
-var redisPool = make(map[string]*redis.Pool, 1)
+var redisPool map[string]*redis.Pool
 var defaultIp string
 
 var NoIpErr = fmt.Errorf("[Redis] ip not register")
@@ -191,4 +191,8 @@ func (r *RedisConn) Lock(key string) (err error) {
 func (r *RedisConn) UnLock(key string) (err error) {
 	r.Del(key)
 	return
+}
+
+func init() {
+	redisPool = make(map[string]*redis.Pool, 0)
 }
