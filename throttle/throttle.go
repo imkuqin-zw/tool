@@ -6,7 +6,6 @@ import (
 	"github.com/imkuqin-zw/tool/encoder"
 	"strconv"
 	"time"
-	"fmt"
 )
 
 type Throttle interface {
@@ -40,7 +39,6 @@ func NewThrottle(req *http.Request, resp http.ResponseWriter, cache CatchThrottl
 
 func (t *throttle) Handle() (bool, error) {
 	sign := t.getRequestSign()
-	fmt.Println(sign)
 	tooMany, err := t.tooManyAttempts(sign)
 	if err != nil {
 		return false, err

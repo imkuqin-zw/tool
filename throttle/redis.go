@@ -4,7 +4,6 @@ import (
 	"github.com/imkuqin-zw/tool/cache"
 	"github.com/garyburd/redigo/redis"
 	"time"
-	"fmt"
 )
 
 type redisCatch struct{
@@ -62,7 +61,6 @@ func (r redisCatch) Hit(key string, decayMinutes int) (hits int, err error) {
 		return
 	}
 	added, err := conn.SetNx(key, 0, decayMinutes * 60)
-	fmt.Println(added)
 	if err != nil {
 		return
 	}
@@ -71,7 +69,6 @@ func (r redisCatch) Hit(key string, decayMinutes int) (hits int, err error) {
 	if err != nil {
 		return
 	}
-	fmt.Println(hits)
 	if !added && hits == 1 {
 		conn.Set(key, 1, decayMinutes * 60)
 	}

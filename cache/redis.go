@@ -115,7 +115,6 @@ func (r *RedisConn) Exist(key string) (exist bool, err error) {
 
 func (r *RedisConn) Increment(key string) (val interface{}, err error) {
 	key = r.prefix + key
-	fmt.Println(key)
 	val, err = r.conn.Do("INCR", key)
 	return
 }
