@@ -6,11 +6,6 @@ import (
 	"fmt"
 )
 
-type RedisConn struct {
-	conn redis.Conn
-	prefix string
-}
-
 var redisPool map[string]*redis.Pool
 var defaultIp string
 
@@ -19,13 +14,16 @@ var NoDefaultErr = fmt.Errorf("[Redis] default not register")
 var DeadLockErr = fmt.Errorf("[Redis] dead lock")
 var NotClose = fmt.Errorf("[Redis] not close")
 
-type RedisConfig struct {
-	MaxIdle 	int
-	MaxActive 	int
-	IdleTimeOut time.Duration
+type redisConn struct {
+	conn redis.Conn
+	prefix string
 }
 
-func RegisterRedis(ip string, config *RedisConfig) {
+func init() {
+	redisPool = make(map[string]*redis.Pool)
+}
+
+func registerRedis(ip string, config *RedisConfig) {
 	_, ok := redisPool[ip]
 	if ok {
 		return
@@ -35,6 +33,9 @@ func RegisterRedis(ip string, config *RedisConfig) {
 			MaxIdle: 80,
 			MaxActive: 12000,
 			IdleTimeOut: 180 * time.Second,
+			ConnectTimeout: time.Second * 10,
+			ReadTimeout: time.Second * 10,
+			WriteTimeout: time.Second * 10,
 		}
 	}
 	redisPool[ip] = &redis.Pool{
@@ -45,6 +46,13 @@ func RegisterRedis(ip string, config *RedisConfig) {
 			c, err := redis.Dial("tcp", ip)
 			return c, err
 		},
+		TestOnBorrow: func(c redis.Conn, t time.Time) error {
+			_, err := c.Do("PING")
+			if err != nil {
+				println(err)
+			}
+			return err
+		},
 	}
 	if len(redisPool) == 1 {
 		defaultIp = ip
@@ -52,7 +60,7 @@ func RegisterRedis(ip string, config *RedisConfig) {
 	return
 }
 
-func SetDefaultRedis(ip string) error {
+func setDefaultRedis(ip string) error {
 	_, ok := redisPool[ip]
 	if !ok {
 		return NoIpErr
@@ -61,41 +69,42 @@ func SetDefaultRedis(ip string) error {
 	return nil
 }
 
-func GetRedisConn(config ...string) (redisConn *RedisConn, err error) {
+func getRedisConn(config ...string) (Conn, error) {
 	if defaultIp == "" {
-		err = NoDefaultErr
-		return
+		return nil, NoDefaultErr
 	}
-	redisConn = &RedisConn{}
+	conn := &redisConn{}
 	paramLen := len(config)
 	if paramLen == 0 {
-		redisConn.conn = redisPool[defaultIp].Get()
+		conn.conn = redisPool[defaultIp].Get()
+	} else if paramLen == 1 {
+		conn.conn = redisPool[defaultIp].Get()
+		conn.prefix = config[0]
 	} else {
-		pool, ok := redisPool[config[0]]
+		pool, ok := redisPool[config[1]]
 		if !ok {
-			err = NoIpErr
-			return
+			return nil, NoIpErr
 		}
-		redisConn.conn = pool.Get()
+		conn.conn = pool.Get()
 		if paramLen > 1 {
-			redisConn.prefix = config[1]
+			conn.prefix = config[0]
 		}
 	}
-	return
+	return conn, nil
 }
 
-func (r *RedisConn) Close() (err error) {
+func (r *redisConn) Close() (err error) {
 	err = r.conn.Close()
 	return
 }
 
-func (r *RedisConn) Get(key string) (value interface{}, err error) {
+func (r *redisConn) Get(key string) (value interface{}, err error) {
 	key = r.prefix + key
 	value, err = r.conn.Do("GET", key)
 	return
 }
 
-func (r *RedisConn) Set(key string, val interface{}, expire int) (err error) {
+func (r *redisConn) Set(key string, val interface{}, expire int) (err error) {
 	key = r.prefix + key
 	_, err = r.conn.Do("SET", key, val)
 	if err != nil {
@@ -107,19 +116,19 @@ func (r *RedisConn) Set(key string, val interface{}, expire int) (err error) {
 	return
 }
 
-func (r *RedisConn) Exist(key string) (exist bool, err error) {
+func (r *redisConn) Exist(key string) (exist bool, err error) {
 	key = r.prefix + key
 	exist, err = redis.Bool(r.conn.Do("EXISTS", key))
 	return
 }
 
-func (r *RedisConn) Increment(key string) (val interface{}, err error) {
+func (r *redisConn) Increment(key string) (val interface{}, err error) {
 	key = r.prefix + key
 	val, err = r.conn.Do("INCR", key)
 	return
 }
 
-func (r *RedisConn) SetNx(key string, val interface{}, expire int) (value bool, err error) {
+func (r *redisConn) SetNx(key string, val interface{}, expire int) (value bool, err error) {
 	key = r.prefix + key
 	notExist, err := redis.Bool(r.conn.Do("SETNX", key, val))
 	if err != nil || !notExist {
@@ -131,51 +140,52 @@ func (r *RedisConn) SetNx(key string, val interface{}, expire int) (value bool, 
 	return
 }
 
-func (r *RedisConn) Del(key string) (err error) {
+func (r *redisConn) Del(key string) (err error) {
 	key = r.prefix + key
 	_, err = r.conn.Do("DEL", key)
 	return
 }
 
-func (r *RedisConn) RPush(key string, val interface{}) (err error) {
+func (r *redisConn) RPush(key string, val interface{}) (err error) {
 	key = r.prefix + key
 	_, err = r.conn.Do("RPUSH", key, val)
 	return
 }
 
-func (r *RedisConn) LPush(key string, val interface{}) (err error) {
+func (r *redisConn) LPush(key string, val interface{}) (err error) {
 	key = r.prefix + key
 	_, err = r.conn.Do("LPUSH", key, val)
 	return
 }
 
-func (r *RedisConn) LPop(key string, val interface{}) (value interface{}, err error) {
+func (r *redisConn) LPop(key string, val interface{}) (value interface{}, err error) {
 	key = r.prefix + key
 	value, err = r.conn.Do("LPOP", key)
 	return
 }
 
-func (r *RedisConn) RPop(key string, val interface{}) (value interface{}, err error) {
+func (r *redisConn) RPop(key string, val interface{}) (value interface{}, err error) {
 	key = r.prefix + key
 	value, err = r.conn.Do("RPOP", key)
 	return
 }
 
-func (r *RedisConn) Do(command, key string, params ...interface{}) (value interface{}, err error) {
+func (r *redisConn) Do(command, key string, params ...interface{}) (value interface{}, err error) {
 	val := []interface{}{r.prefix + key}
 	val = append(val, params...)
 	value, err = r.conn.Do(command, val...)
 	return
 }
 
-func (r *RedisConn) Lock(key string) (err error) {
+func (r *redisConn) Lock(key string) (err error) {
 	startTime := time.Now()
 	for {
-		_, err = r.Get(key)
-		if err != nil && err != redis.ErrNil {
+		var result interface{}
+		result, err = r.Get(key)
+		if err != nil {
 			return
 		}
-		if err == redis.ErrNil {
+		if result == nil {
 			err = r.Set(key, "lock", 10)
 			return
 		}
@@ -188,11 +198,7 @@ func (r *RedisConn) Lock(key string) (err error) {
 	return
 }
 
-func (r *RedisConn) UnLock(key string) (err error) {
-	r.Del(key)
+func (r *redisConn) UnLock(key string) (err error) {
+	err = r.Del(key)
 	return
-}
-
-func init() {
-	redisPool = make(map[string]*redis.Pool, 0)
 }
