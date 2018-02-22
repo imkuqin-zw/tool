@@ -74,10 +74,12 @@ func (kv *KVMap) Count() int {
 	return kv.count
 }
 
-func (kv *KVMap) SortAsc() {
+func (kv *KVMap) SortAsc() *KVMap {
 	sort.Strings(kv.keys)
+	return kv
 }
 
-func (kv *KVMap) SortDesc() {
+func (kv *KVMap) SortDesc() *KVMap {
 	sort.Sort(sort.Reverse(sort.StringSlice(kv.keys)))
+	return kv
 }
