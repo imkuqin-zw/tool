@@ -9,7 +9,7 @@ import (
 )
 
 func TestThrottle_Handle(t *testing.T) {
-	cache.RegisterRedis("127.0.0.1:6379", nil)
+	cache.Register("127.0.0.1:6379", nil)
 	http.HandleFunc("/", func(writer http.ResponseWriter, request *http.Request) {
 		filter := NewThrottle(request, writer, NewRedisCatch("127.0.0.1:6379"), 20, 1)
 		pass, err := filter.Handle()
@@ -23,5 +23,5 @@ func TestThrottle_Handle(t *testing.T) {
 		}
 		fmt.Fprintf(writer, "%v", "hello world")
 	})
-	log.Fatal(http.ListenAndServe(":8081", nil))
+	log.Fatal(http.ListenAndServe(":8092", nil))
 }

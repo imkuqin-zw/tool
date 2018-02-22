@@ -16,7 +16,7 @@ func NewRedisCatch(ip string) CatchThrottle {
 }
 
 func (r redisCatch) Attempts(key string) (val int, err error) {
-	conn, err := cache.GetRedisConn(r.ip, r.prefix)
+	conn, err := cache.NewConn(r.prefix, r.ip)
 	if err != nil {
 		return
 	}
@@ -30,7 +30,7 @@ func (r redisCatch) Attempts(key string) (val int, err error) {
 }
 
 func (r redisCatch) Has(key string) (exist bool, err error) {
-	conn, err := cache.GetRedisConn(r.ip, r.prefix)
+	conn, err := cache.NewConn(r.prefix, r.ip)
 	if err != nil {
 		return
 	}
@@ -40,7 +40,7 @@ func (r redisCatch) Has(key string) (exist bool, err error) {
 }
 
 func (r redisCatch) ResetAttempts(key string) (err error)  {
-	conn, err := cache.GetRedisConn(r.ip, r.prefix)
+	conn, err := cache.NewConn(r.prefix, r.ip)
 	if err != nil {
 		return
 	}
@@ -50,7 +50,7 @@ func (r redisCatch) ResetAttempts(key string) (err error)  {
 }
 
 func (r redisCatch) Hit(key string, decayMinutes int) (hits int, err error) {
-	conn, err := cache.GetRedisConn(r.ip, r.prefix)
+	conn, err := cache.NewConn(r.prefix, r.ip)
 	if err != nil {
 		return
 	}
@@ -76,7 +76,7 @@ func (r redisCatch) Hit(key string, decayMinutes int) (hits int, err error) {
 }
 
 func (r redisCatch) availableIn(key string) (validTime int, err error) {
-	conn, err := cache.GetRedisConn(r.ip, r.prefix)
+	conn, err := cache.NewConn(r.prefix, r.ip)
 	if err != nil {
 		return
 	}
