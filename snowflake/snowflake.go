@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"crypto/md5"
 	"strconv"
+	"sync/atomic"
 )
 
 var workId int64
@@ -28,10 +29,10 @@ func GetUUID() int64 {
 	if now != lastMillisecond {
 		sequence = 0
 	} else {
-		sequence++
+		atomic.AddInt64(&sequence, 1)
 	}
 	lastMillisecond = now
-	return (now << 22) | (dataCenterId << 17) | (workId << 12) | sequence
+	return now << 22 | dataCenterId << 17 | workId << 12 | sequence
 }
 
 //初始化节点标识
