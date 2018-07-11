@@ -16,18 +16,19 @@ var ErrNotFunc = errors.New("[Excel] no func error")
 //create excel file by struct array
 func CreateByStructs(data []interface{}) (err error, file *xlsx.File ) {
 	file = xlsx.NewFile()
-	err = createSheetBystructs(file, "Sheet1", data)
+	err = createSheetByStructs(file, "Sheet1", data)
 	return
 }
 
+// 通过结构体KVMap创建多个sheet
 func CreateByKVMapStructs(data *order.KVMap) (err error, file *xlsx.File) {
-	if len(data.Keys()) == 0 {
+	if data.Count() == 0 {
 		return ErrNoData, nil
 	}
 	file = xlsx.NewFile()
 	keys, values := data.GetAllKV()
 	for i, key := range keys {
-		err = createSheetBystructs(file, key, values[i].([]interface{}))
+		err = createSheetByStructs(file, key, values[i].([]interface{}))
 		if err != nil {
 			return
 		}
@@ -36,6 +37,24 @@ func CreateByKVMapStructs(data *order.KVMap) (err error, file *xlsx.File) {
 	return
 }
 
+// 通过结构体KVLink创建多个sheet
+func CreateByKVLinkStructs(data *order.KVLinkHead) (err error, file *xlsx.File) {
+	if data.GetCount() == 0 {
+		return ErrNoData, nil
+	}
+	file = xlsx.NewFile()
+	keys, values := data.GetAllKV()
+	for i, key := range keys {
+		err = createSheetByStructs(file, key, values[i].([]interface{}))
+		if err != nil {
+			return
+		}
+	}
+
+	return
+}
+
+// 通过结构体创建表头
 func CreateHeadByStruct(m interface{}, key string) (file *xlsx.File, err error) {
 	file = xlsx.NewFile()
 	sheet, err := file.AddSheet(key)
@@ -44,32 +63,33 @@ func CreateHeadByStruct(m interface{}, key string) (file *xlsx.File, err error) 
 	}
 	t := reflect.TypeOf(m)
 	row := sheet.AddRow()
-	err , _ = createRowHeaderBystructs(row, t)
+	err , _ = createRowHeaderByStruct(row, t)
 	return
 }
 
+// 通过KVMap中值的不同类型创建多个sheep
 func CreateByKVMapInterface(data *order.KVMap) (err error, file *xlsx.File) {
 	file = xlsx.NewFile()
 	data.SortAsc()
 	keys, values := data.GetAllKV()
 	for i, key := range keys {
 		t := reflect.TypeOf(values[i])
-		if t.Kind() == reflect.Ptr {
+		for t.Kind() == reflect.Ptr {
 			t = t.Elem()
 		}
-		name := t.Name()
-		if name == "KVMap" {
+		name := t.String()
+		if name == "[]*order.KVMap" { //KVMap创建有数据的sheet
 			err = createSheetByKVMap(file, key, values[i].([]*order.KVMap))
 			if err != nil {
 				return
 			}
-		} else if name == "KVLinkHead" {
+		} else if name == "order.KVLinkHead" { //创建没数据的sheet
 			err = createSheetKVLink(file, key, values[i].(*order.KVLinkHead), []map[string]interface{}{})
 			if err != nil {
 				return
 			}
-		} else {
-			err = createSheetBystructs(file, key, values[i].([]interface{}))
+		} else { //Struct创建有数据的表
+			err = createSheetByStructs(file, key, values[i].([]interface{}))
 			if err != nil {
 				return
 			}
@@ -78,31 +98,28 @@ func CreateByKVMapInterface(data *order.KVMap) (err error, file *xlsx.File) {
 	return
 }
 
-func CreateByKVLink(head *order.KVLinkHead, data []map[string]interface{}) (file *xlsx.File, err error) {
+// 通过KVLink创建表
+func CreateByKVLink(head *order.KVLinkHead, data []map[string]interface{}, key string) (file *xlsx.File, err error) {
 	file = xlsx.NewFile()
-	err = createSheetKVLink(file, "Sheet1", head, data)
+	if key == "" {
+		key = "sheet1"
+	}
+	err = createSheetKVLink(file, key, head, data)
 	return
 }
 
-func CreateByKVMap(data []*order.KVMap) (file *xlsx.File, err error) {
+// 通过KVMap创建表
+func CreateByKVMap(data []*order.KVMap, key string) (file *xlsx.File, err error) {
 	file = xlsx.NewFile()
+	if key == "" {
+		key = "sheet1"
+	}
 	err = createSheetByKVMap(file, "sheet1", data)
 	return
 }
 
-func CreateByMapKVMap(data *order.KVMap) (file *xlsx.File, err error) {
-	file = xlsx.NewFile()
-	keys, values := data.GetAllKV()
-	for i, key := range keys {
-		err = createSheetByKVMap(file, key, values[i].([]*order.KVMap))
-		if err != nil {
-			return
-		}
-	}
-	return
-}
-
-func createSheetBystructs(file *xlsx.File, key string, values []interface{}) (err error) {
+// 创建sheet通过结构体
+func createSheetByStructs(file *xlsx.File, key string, values []interface{}) (err error) {
 	if len(values) == 0 {
 		return ErrNoData
 	}
@@ -114,12 +131,12 @@ func createSheetBystructs(file *xlsx.File, key string, values []interface{}) (er
 	//header
 	t := reflect.TypeOf(values[0])
 	row := sheet.AddRow()
-	err , exports := createRowHeaderBystructs(row, t)
+	err , exports := createRowHeaderByStruct(row, t)
 	//data
 	for i := 0; i < len(values); i++ {
 		//val := reflect.ValueOf(values[i])
 		row = sheet.AddRow()
-		if err = createRowDataBystructs(row, reflect.ValueOf(values[i]), exports); err != nil {
+		if err = createRowDataByStructs(row, reflect.ValueOf(values[i]), exports); err != nil {
 			return
 		}
 	}
@@ -127,7 +144,8 @@ func createSheetBystructs(file *xlsx.File, key string, values []interface{}) (er
 	return
 }
 
-func createRowHeaderBystructs(row *xlsx.Row, t reflect.Type) (err error, exports []interface{}) {
+// 通过结构体创建sheet头
+func createRowHeaderByStruct(row *xlsx.Row, t reflect.Type) (err error, exports []interface{}) {
 	if t.Kind() == reflect.Ptr {
 		t = t.Elem()
 	}
@@ -144,7 +162,7 @@ func createRowHeaderBystructs(row *xlsx.Row, t reflect.Type) (err error, exports
 			continue
 		}
 		if cellName == "struct" {
-			err, appendExports := createRowHeaderBystructs(row,t.Field(i).Type)
+			err, appendExports := createRowHeaderByStruct(row,t.Field(i).Type)
 			if err != nil {
 				return err, nil
 			}
@@ -157,7 +175,8 @@ func createRowHeaderBystructs(row *xlsx.Row, t reflect.Type) (err error, exports
 	return
 }
 
-func createRowDataBystructs (row *xlsx.Row, val reflect.Value, exports []interface{})  error {
+// 通过结构体创建数据
+func createRowDataByStructs(row *xlsx.Row, val reflect.Value, exports []interface{})  error {
 	if val.Kind() == reflect.Ptr {
 		val = val.Elem()
 	}
@@ -189,7 +208,7 @@ func createRowDataBystructs (row *xlsx.Row, val reflect.Value, exports []interfa
 			row.AddCell().SetValue(item.Interface())
 		} else {
 			for k, v := range index.(map[int][]interface{}) {
-				if err := createRowDataBystructs(row, val.Field(k), v); err != nil {
+				if err := createRowDataByStructs(row, val.Field(k), v); err != nil {
 					return err
 				}
 			}
@@ -199,6 +218,7 @@ func createRowDataBystructs (row *xlsx.Row, val reflect.Value, exports []interfa
 	return nil
 }
 
+// 通过KVMap创建sheet
 func createSheetByKVMap(file *xlsx.File, key string, data []*order.KVMap) ( err error){
 	sheet, err := file.AddSheet(key)
 	if err != nil {
@@ -214,6 +234,7 @@ func createSheetByKVMap(file *xlsx.File, key string, data []*order.KVMap) ( err 
 	return
 }
 
+// 通过KVLink创建sheet
 func createSheetKVLink(file *xlsx.File, key string, head *order.KVLinkHead, data []map[string]interface{}) ( err error ) {
 	if head.GetCount() == 0 {
 		return ErrParams
@@ -236,6 +257,7 @@ func createSheetKVLink(file *xlsx.File, key string, head *order.KVLinkHead, data
 	return
 }
 
+// 解析tag，获得表头
 func getCellNameByTag(tag string) (err error, cellName string) {
 	for _, v := range strings.Split(tag, ";") {
 		if v == "" {
@@ -251,6 +273,7 @@ func getCellNameByTag(tag string) (err error, cellName string) {
 	return errors.New("[Excel] not found cell name from tag"), ""
 }
 
+// 解析tag，获得处理该字段所需的函数名和参数
 func getFuncByTag(tag string) (err error, funcName []string, params[][]string) {
 	for _, item := range strings.Split(tag, ";") {
 		if item == "" {
