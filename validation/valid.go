@@ -14,7 +14,7 @@ var DefMsgLang = "en"
 var validFuncs reflectfunc.ReflectFunc
 
 // ValidTag struct tag.
-var ValidTag = "valid"
+const ValidTag = "valid"
 
 type Validation struct {
 	Lang 		string
@@ -40,6 +40,62 @@ func (v *Validation) Required(filed interface{}, name string) *Error {
 
 func (v *Validation) Regex(filed interface{}, name string, regex *regexp.Regexp, match bool) *Error {
 	return v.apply(Regex{Field:name, Lang: v.Lang, Regex: regex, Match: match}, filed)
+}
+
+func (v *Validation) Min(filed interface{}, name string, min int) *Error {
+	return v.apply(Min{Field:name, Lang: v.Lang, Min: min}, filed)
+}
+
+func (v *Validation) Max(filed interface{}, name string, max int) *Error {
+	return v.apply(Max{Field:name, Lang: v.Lang, Max: max}, filed)
+}
+
+func (v *Validation) Range(filed interface{}, name string, min, max int) *Error {
+	return v.apply(Range{Field:name, Lang: v.Lang, Max: max, Min: min}, filed)
+}
+
+func (v *Validation) MinSize(filed interface{}, name string, min int) *Error {
+	return v.apply(MinSize{Field:name, Lang: v.Lang, Min: min}, filed)
+}
+
+func (v *Validation) MaxSize(filed interface{}, name string, max int) *Error {
+	return v.apply(MaxSize{Field:name, Lang: v.Lang, Max: max}, filed)
+}
+
+func (v *Validation) Length(filed interface{}, name string, num int) *Error {
+	return v.apply(Length{Field:name, Lang: v.Lang, Num: num}, filed)
+}
+
+func (v *Validation) Alpha(filed interface{}, name string) *Error {
+	return v.apply(Alpha{Field:name, Lang: v.Lang}, filed)
+}
+
+func (v *Validation) Numeric(filed interface{}, name string) *Error {
+	return v.apply(Numeric{Field:name, Lang: v.Lang}, filed)
+}
+
+func (v *Validation) AlphaNumeric(filed interface{}, name string) *Error {
+	return v.apply(AlphaNumeric{Field:name, Lang: v.Lang}, filed)
+}
+
+func (v *Validation) Email(filed interface{}, name string) *Error {
+	return v.apply(Email{Field:name, Lang: v.Lang}, filed)
+}
+
+func (v *Validation) Ip(filed interface{}, name string) *Error {
+	return v.apply(Ip{Field:name, Lang: v.Lang}, filed)
+}
+
+func (v *Validation) Mobile(filed interface{}, name string) *Error {
+	return v.apply(Mobile{Field:name, Lang: v.Lang}, filed)
+}
+
+func (v *Validation) Tel(filed interface{}, name string) *Error {
+	return v.apply(Tel{Field:name, Lang: v.Lang}, filed)
+}
+
+func (v *Validation) Phone(filed interface{}, name string) *Error {
+	return v.apply(Phone{Field:name, Lang: v.Lang}, filed)
 }
 
 func (v *Validation) apply(validator Validator, filed interface{}) *Error {

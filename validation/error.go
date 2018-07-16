@@ -42,11 +42,9 @@ var MsgTmplEn = MsgTmpl{
 	"AlphaDash":    "Must be valid alpha or numeric or dash(-_) characters",
 	"Email":        "Must be a valid email address",
 	"IP":           "Must be a valid ip address",
-	"Base64":       "Must be valid base64 characters",
 	"Mobile":       "Must be valid mobile number",
 	"Tel":          "Must be valid telephone number",
 	"Phone":        "Must be valid telephone or mobile phone number",
-	"ZipCode":      "Must be valid zipcode",
 }
 
 // Set error message template.

@@ -176,3 +176,31 @@ func parseFunc(tag, field string) (validFunc ValidFunc, err error) {
 func mergeParam(v *Validation, obj interface{}, params []interface{}) []interface{} {
 	return append([]interface{}{v, obj}, params...)
 }
+
+func IsNumType(field interface{}) bool {
+	switch field.(type) {
+	case int:
+		return true
+	case int8:
+		return true
+	case int16:
+		return true
+	case int32:
+		return true
+	case int64:
+		return true
+	case uint8:
+		return true
+	case uint16:
+		return true
+	case uint32:
+		return true
+	case uint64:
+		return true
+	case float64:
+		return true
+	case float32:
+		return true
+	}
+	return false
+}
