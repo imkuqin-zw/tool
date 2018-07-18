@@ -440,22 +440,22 @@ type Ip struct {
 	Field string
 }
 
-func (e Ip) IsValid(field interface{}) (b bool) {
+func (i Ip) IsValid(field interface{}) (b bool) {
 	if str, ok := field.(string); ok {
 		return ipPattern.MatchString(str)
 	}
 	return false
 }
 
-func (e Ip) GetMsg() string {
-	if e.Lang == "" {
-		e.Lang = DefMsgLang
+func (i Ip) GetMsg() string {
+	if i.Lang == "" {
+		i.Lang = DefMsgLang
 	}
-	return fmt.Sprintf(MsgTmplMap[e.Lang]["Ip"])
+	return fmt.Sprintf(MsgTmplMap[i.Lang]["Ip"])
 }
 
-func (e Ip) GetField() string {
-	return e.Field
+func (i Ip) GetField() string {
+	return i.Field
 }
 
 var mobilePattern = regexp.MustCompile(`^((\+86)|(86))?(1(([35][0-9])|[8][0-9]|[7][06789]|[4][579]))\d{8}$`)

@@ -164,7 +164,8 @@ func (v *Validation) Valid(obj interface{}) (b bool, err error) {
 		}
 
 		for _, item := range funcs {
-			if _, err = validFuncs.Invoke(item.Name, mergeParam(v, objV.Field(i).Interface(), item.Params)...); err != nil {
+			if _, err = validFuncs.Invoke(item.Name,
+				mergeParam(v, objV.Field(i).Interface(), item.Params)...); err != nil {
 				return
 			}
 		}

@@ -41,7 +41,7 @@ var MsgTmplEn = MsgTmpl{
 	"NoMatch":      "Must not match %s",
 	"AlphaDash":    "Must be valid alpha or numeric or dash(-_) characters",
 	"Email":        "Must be a valid email address",
-	"IP":           "Must be a valid ip address",
+	"Ip":           "Must be a valid ip address",
 	"Mobile":       "Must be valid mobile number",
 	"Tel":          "Must be valid telephone number",
 	"Phone":        "Must be valid telephone or mobile phone number",

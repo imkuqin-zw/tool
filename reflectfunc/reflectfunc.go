@@ -18,6 +18,9 @@ type ReflectFunc interface{
 
 	// Get the number of the function`s parameters by function name.
 	GetParamsNumByName(name string) int
+
+	// Get the function by name.
+	GetFuncByName(name string) (reflect.Value, bool)
 }
 
 // Get a ReflectFunc.
@@ -58,6 +61,11 @@ func (f reflectFunc) Invoke(name string, params ...interface{}) (result []reflec
 	}
 
 	result = f[name].Call(in)
+	return
+}
+
+func (f reflectFunc) GetFuncByName(name string) (result reflect.Value, exist bool) {
+	result, exist = f[name]
 	return
 }
 

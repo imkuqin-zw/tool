@@ -5,6 +5,7 @@ import (
 	"strings"
 	"regexp"
 	"fmt"
+	"strconv"
 )
 
 func isStruct(t reflect.Type) bool {
@@ -140,9 +141,15 @@ func parseFunc(tag, field string) (validFunc ValidFunc, err error) {
 	if start != -1 {
 		funcName = tag[:start]
 	}
+	fn, b := validFuncs.GetFuncByName(funcName)
+	if !b {
+		err = fmt.Errorf("%s : not found the %s function", field, tag)
+		return
+	}
+
 	paramsNum := validFuncs.GetParamsNumByName(funcName)
 	if paramsNum == -1  {
-		fmt.Errorf("%s : invalid %s function", field, tag)
+		err = fmt.Errorf("%s : invalid %s function", field, tag)
 		return
 	}
 	paramsNum -= 2
@@ -163,13 +170,49 @@ func parseFunc(tag, field string) (validFunc ValidFunc, err error) {
 			err = fmt.Errorf("%s : %s require %d parameters", field, tag, paramsNum)
 			return
 		}
+		var temp interface{}
 		for i, item := range fParams {
-			params[i] = strings.TrimSpace(item)
+			temp, err = ParseParam(fn.Type().In(i + 3), strings.TrimSpace(item))
+			params = append(params, temp)
 		}
-		params = append(params, fParams)
 	}
 
 	validFunc = ValidFunc{Name:funcName, Params:params}
+	return
+}
+
+func ParseParam(t reflect.Type, param string) (i interface{}, err error) {
+	switch t.Kind() {
+	case reflect.Int:
+		i, err = strconv.Atoi(param)
+	case reflect.Int64:
+		if wordsize == 32 {
+			return nil, fmt.Errorf("not support int64 on 32-bit platform")
+		}
+		i, err = strconv.ParseInt(param, 10, 64)
+	case reflect.Int32:
+		var v int64
+		v, err = strconv.ParseInt(param, 10, 32)
+		if err == nil {
+			i = int32(v)
+		}
+	case reflect.Int16:
+		var v int64
+		v, err = strconv.ParseInt(param, 10, 16)
+		if err == nil {
+			i = int16(v)
+		}
+	case reflect.Int8:
+		var v int64
+		v, err = strconv.ParseInt(param, 10, 8)
+		if err == nil {
+			i = int8(v)
+		}
+	case reflect.String:
+		i = param
+	default:
+		err = fmt.Errorf("not support %s", t.Kind().String())
+	}
 	return
 }
 
@@ -204,3 +247,4 @@ func IsNumType(field interface{}) bool {
 	}
 	return false
 }
+

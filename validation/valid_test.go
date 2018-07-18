@@ -8,12 +8,20 @@ import (
 type TestValid struct {
 	Test 	string 	`valid:"Required;Regex(/^1[0-9]*9$/)"`
 	Phone 	string 	`valid:"Required;Mobile"`
+	Email 	string 	`valid:"Required;Email"`
+	Ip 		string 	`valid:"Required;Ip"`
+	S 		string 	`valid:"Required;AlphaNumeric"`
+	N 		string 	`valid:"Required;Numeric"`
+	A 		string 	`valid:"Required;Alpha"`
+	Min 	int 	`valid:"Required;Min(3)"`
+	Max 	int 	`valid:"Required;Max(-1)"`
+	MinSize 	string 	`valid:"Required;MinSize(2)"`
 }
 
 func (t TestValid) ValidMessage() map[string]map[string]string {
 	return map[string]map[string]string{
 		"Test": {
-			"Required": "必须填写该字段",
+			"Required": "的沙发",
 			"Regex": "格式错误",
 		},
 		"Phone": {
@@ -25,7 +33,7 @@ func (t TestValid) ValidMessage() map[string]map[string]string {
 
 func TestValidation_Valid(t *testing.T) {
 	valid := NewValidation()
-	test := &TestValid{Test:"19", Phone:"18408244992"}
+	test := &TestValid{Test:"19", Phone:"1840844992", A:"5", N:"5", MinSize:"13"}
 	b, err := valid.Valid(test)
 	if err != nil {
 		fmt.Println(err.Error())
