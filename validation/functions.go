@@ -95,11 +95,11 @@ func parseTag(field reflect.StructField) (result []string, hasRegex, required bo
 }
 
 func isRegex(in string) bool {
-	index := strings.Index(in, "Regex(/")
+	index := strings.Index(in, "Regex(")
 	if index == -1 {
 		return false
 	}
-	end := strings.Index(in, "/)")
+	end := strings.Index(in, ")")
 	if end < index {
 		return false
 	}
@@ -166,7 +166,7 @@ func parseFunc(tag, field string) (validFunc ValidFunc, err error) {
 			return
 		}
 		fParams := strings.Split(tag[start+1:end], ",")
-		if paramsNum != len(params) {
+		if paramsNum != len(fParams) {
 			err = fmt.Errorf("%s : %s require %d parameters", field, tag, paramsNum)
 			return
 		}
