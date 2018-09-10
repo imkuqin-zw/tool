@@ -82,6 +82,8 @@ func (r Required) IsValid(field interface{}) bool {
 	v := reflect.ValueOf(field)
 	if v.Kind() == reflect.Slice {
 		return v.Len() > 0
+	} else if v.Kind() == reflect.Ptr {
+		return !v.IsNil()
 	}
 	return true
 }
