@@ -1,6 +1,6 @@
 package throttle
 
-type CatchThrottle interface{
+type CatchThrottle interface {
 	Attempts(key string) (int, error)
 	Has(key string) (bool, error)
 	ResetAttempts(key string) error
@@ -8,3 +8,6 @@ type CatchThrottle interface{
 	availableIn(key string) (int, error)
 }
 
+type CatchSlidingWindow interface {
+	Attempts(key string) (int, error)
+}

@@ -1,21 +1,21 @@
 package throttle
 
 import (
-	"github.com/imkuqin-zw/tool/cache"
 	"github.com/garyburd/redigo/redis"
+	"github.com/imkuqin-zw/tool/cache"
 	"time"
 )
 
-type redisCatch struct{
-	ip string
+type redisThrottle struct {
+	ip     string
 	prefix string
 }
 
 func NewRedisCatch(ip string) CatchThrottle {
-	return redisCatch{ip: ip, prefix: "throttle_"}
+	return &redisThrottle{ip: ip, prefix: "throttle_"}
 }
 
-func (r redisCatch) Attempts(key string) (val int, err error) {
+func (r *redisThrottle) Attempts(key string) (val int, err error) {
 	conn, err := cache.NewConn(r.prefix, r.ip)
 	if err != nil {
 		return
@@ -29,7 +29,7 @@ func (r redisCatch) Attempts(key string) (val int, err error) {
 	return
 }
 
-func (r redisCatch) Has(key string) (exist bool, err error) {
+func (r *redisThrottle) Has(key string) (exist bool, err error) {
 	conn, err := cache.NewConn(r.prefix, r.ip)
 	if err != nil {
 		return
@@ -39,7 +39,7 @@ func (r redisCatch) Has(key string) (exist bool, err error) {
 	return
 }
 
-func (r redisCatch) ResetAttempts(key string) (err error)  {
+func (r *redisThrottle) ResetAttempts(key string) (err error) {
 	conn, err := cache.NewConn(r.prefix, r.ip)
 	if err != nil {
 		return
@@ -49,18 +49,18 @@ func (r redisCatch) ResetAttempts(key string) (err error)  {
 	return
 }
 
-func (r redisCatch) Hit(key string, decayMinutes int) (hits int, err error) {
+func (r *redisThrottle) Hit(key string, decayMinutes int) (hits int, err error) {
 	conn, err := cache.NewConn(r.prefix, r.ip)
 	if err != nil {
 		return
 	}
 	defer conn.Close()
-	availableAt := int(time.Now().Unix()) + decayMinutes * 60
-	_, err = conn.SetNx(key + ":timer", availableAt, decayMinutes * 60)
+	availableAt := int(time.Now().Unix()) + decayMinutes*60
+	_, err = conn.SetNx(key+":timer", availableAt, decayMinutes*60)
 	if err != nil {
 		return
 	}
-	added, err := conn.SetNx(key, 0, decayMinutes * 60)
+	added, err := conn.SetNx(key, 0, decayMinutes*60)
 	if err != nil {
 		return
 	}
@@ -70,12 +70,12 @@ func (r redisCatch) Hit(key string, decayMinutes int) (hits int, err error) {
 		return
 	}
 	if !added && hits == 1 {
-		conn.Set(key, 1, decayMinutes * 60)
+		conn.Set(key, 1, decayMinutes*60)
 	}
 	return
 }
 
-func (r redisCatch) availableIn(key string) (validTime int, err error) {
+func (r *redisThrottle) availableIn(key string) (validTime int, err error) {
 	conn, err := cache.NewConn(r.prefix, r.ip)
 	if err != nil {
 		return
