@@ -9,5 +9,6 @@ type CatchThrottle interface {
 }
 
 type CatchSlidingWindow interface {
-	Attempts(key string) (int, error)
+	GetLastTs(key string) (int64, error)
+	Hit(key string, curWind, now, duration int64) error
 }

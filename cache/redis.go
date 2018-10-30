@@ -1,9 +1,9 @@
 package cache
 
 import (
+	"fmt"
 	"github.com/garyburd/redigo/redis"
 	"time"
-	"fmt"
 )
 
 var redisPool map[string]*redis.Pool
@@ -15,7 +15,7 @@ var DeadLockErr = fmt.Errorf("[Redis] dead lock")
 var NotClose = fmt.Errorf("[Redis] not close")
 
 type redisConn struct {
-	conn redis.Conn
+	conn   redis.Conn
 	prefix string
 }
 
@@ -30,17 +30,17 @@ func registerRedis(ip string, config *RedisConfig) {
 	}
 	if config == nil {
 		config = &RedisConfig{
-			MaxIdle: 80,
-			MaxActive: 12000,
-			IdleTimeOut: 180 * time.Second,
+			MaxIdle:        80,
+			MaxActive:      12000,
+			IdleTimeOut:    180 * time.Second,
 			ConnectTimeout: time.Second * 10,
-			ReadTimeout: time.Second * 10,
-			WriteTimeout: time.Second * 10,
+			ReadTimeout:    time.Second * 10,
+			WriteTimeout:   time.Second * 10,
 		}
 	}
 	redisPool[ip] = &redis.Pool{
-		MaxIdle: config.MaxIdle,
-		MaxActive: config.MaxActive,
+		MaxIdle:     config.MaxIdle,
+		MaxActive:   config.MaxActive,
 		IdleTimeout: config.IdleTimeOut,
 		Dial: func() (redis.Conn, error) {
 			c, err := redis.Dial("tcp", ip)
@@ -189,7 +189,7 @@ func (r *redisConn) Lock(key string) (err error) {
 			err = r.Set(key, "lock", 10)
 			return
 		}
-		if time.Now().Sub(startTime) > time.Second * 4 {
+		if time.Now().Sub(startTime) > time.Second*4 {
 			r.Del(key)
 			return DeadLockErr
 		}
@@ -201,4 +201,41 @@ func (r *redisConn) Lock(key string) (err error) {
 func (r *redisConn) UnLock(key string) (err error) {
 	err = r.Del(key)
 	return
+}
+
+func (r *redisConn) HGet(key, field string) (interface{}, error) {
+	key = r.prefix + key
+	return r.conn.Do("HGET", key, field)
+}
+
+func (r *redisConn) HMGet(key string, field ...interface{}) (interface{}, error) {
+	key = r.prefix + key
+	params := []interface{}{key}
+	params = append(params, field...)
+	return r.conn.Do("HMGET", params...)
+}
+
+func (r *redisConn) HDel(key string, field ...interface{}) error {
+	key = r.prefix + key
+	params := []interface{}{key}
+	params = append(params, field)
+	_, err := r.conn.Do("HDEL", params...)
+	return err
+}
+
+func (r *redisConn) HSet(key, field string, value interface{}) error {
+	key = r.prefix + key
+	_, err := r.conn.Do("HSET", key, field, value)
+	return err
+}
+
+func (r *redisConn) HIncrby(key, field string, val interface{}) (interface{}, error) {
+	key = r.prefix + key
+	return r.conn.Do("HINCRBY", key, field, val)
+}
+
+func (r *redisConn) Expire(key string, duration time.Duration) error {
+	key = r.prefix + key
+	_, err := r.conn.Do("EXPIRE", key, duration/time.Second)
+	return err
 }
