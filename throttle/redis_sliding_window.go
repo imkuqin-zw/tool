@@ -15,6 +15,15 @@ type redisSlidingWindow struct {
 	prefix string
 }
 
+func (r *redisSlidingWindow) DecrCount(key string, count int) (int, error) {
+	conn, err := cache.NewConn(r.prefix, r.ip)
+	if err != nil {
+		return 0, err
+	}
+	defer conn.Close()
+	return redis.Int(conn.HIncrby(key, COUNT, -count))
+}
+
 func (r *redisSlidingWindow) GetLastTs(key string) (int64, error) {
 	conn, err := cache.NewConn(r.prefix, r.ip)
 	if err != nil {
