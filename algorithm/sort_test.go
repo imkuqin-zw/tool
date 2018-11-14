@@ -32,12 +32,24 @@ func TestBubbleSort(t *testing.T) {
 
 func TestQuickSort(t *testing.T) {
 	in := []interface{}{5, 2, 75, 5, 6, 9, 7, 1, 0, 2, 5, 0, 9, 1, 3, 4}
-	QuickSort(in, 0, len(in)-1, compare)
+	QuickSort(in, compare)
 	fmt.Println(in)
 }
 
 func TestSelectSort(t *testing.T) {
 	in := []interface{}{5, 2, 75, 5, 6, 9, 7, 1, 0, 2, 5, 0, 9, 1, 3, 4}
 	SelectSort(in, compare)
+	fmt.Println(in)
+}
+
+func TestMergeSort(t *testing.T) {
+	in := []interface{}{5, 2, 75, 5, 6, 9, 7, 1, 0, 2, 5, 0, 9, 1, 3, 4}
+	MergeSort(in, compare)
+	fmt.Println(in)
+}
+
+func TestInsert(t *testing.T) {
+	in := []int{5, 9, 1, 1, 3, 2, 4}
+	Test(in)
 	fmt.Println(in)
 }
