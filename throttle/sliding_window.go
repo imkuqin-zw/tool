@@ -41,9 +41,10 @@ func (c *SlidingWindow) tooManyAttempts(key string, curWind, now int64) (bool, e
 	if lastTs != 0 {
 		elapsed := now - lastTs
 		if elapsed >= c.duration {
-			//if err = c.catch.Reset(key, curWind, now, c.duration); err != nil {
-			//	return false, err
-			//}
+			_, err = c.cleanWinds(key, c.getWindForClean(curWind, c.count-1, c.count))
+			if err != nil {
+				return false, err
+			}
 			return false, nil
 		}
 		lastWind := (lastTs / c.interval) % c.count
@@ -54,7 +55,7 @@ func (c *SlidingWindow) tooManyAttempts(key string, curWind, now int64) (bool, e
 				return false, err
 			}
 		}
-		if cur + 1 > c.maxAttempts {
+		if cur+1 > c.maxAttempts {
 			return true, nil
 		}
 	}

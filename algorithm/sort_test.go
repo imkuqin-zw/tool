@@ -47,9 +47,3 @@ func TestMergeSort(t *testing.T) {
 	MergeSort(in, compare)
 	fmt.Println(in)
 }
-
-func TestInsert(t *testing.T) {
-	in := []int{5, 9, 1, 1, 3, 2, 4}
-	Test(in)
-	fmt.Println(in)
-}
