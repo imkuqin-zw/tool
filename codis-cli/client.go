@@ -6,6 +6,7 @@ import (
 	"fmt"
 	etcdV2 "github.com/coreos/etcd/client"
 	"github.com/garyburd/redigo/redis"
+	"math/rand"
 	"sync"
 	"time"
 )
@@ -31,7 +32,6 @@ type NodeConfig struct {
 type Client struct {
 	mu       sync.RWMutex
 	nodePool map[string]*redis.Pool
-	curIndex uint64
 	nodeArr  []string
 	nodeLen  uint64
 	config   Config
@@ -76,9 +76,7 @@ func (c *Client) GetConn() redis.Conn {
 	if c.nodeLen == 0 {
 		return nil
 	}
-	index := c.curIndex % c.nodeLen
-	c.curIndex++
-	fmt.Println("--------------", c.curIndex, index, c.nodeArr[index])
+	index := rand.Uint64() % c.nodeLen
 	return c.nodePool[c.nodeArr[index]].Get()
 }
 
