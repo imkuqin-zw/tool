@@ -1,24 +1,24 @@
-package codis_cli
+package codis_cli_redigo
 
 import (
 	"context"
 	"encoding/json"
-	"fmt"
 	etcdV2 "github.com/coreos/etcd/client"
-	"github.com/garyburd/redigo/redis"
+	"github.com/go-redis/redis"
 	"math/rand"
 	"sync"
 	"time"
 )
 
 type Config struct {
-	MaxIdle        int
-	MaxActive      int
-	IdleTimeOut    time.Duration
-	ConnectTimeout time.Duration
-	ReadTimeout    time.Duration
-	WriteTimeout   time.Duration
-	RegisterKey    string
+	DB           int
+	DialTimeout  time.Duration
+	ReadTimeout  time.Duration
+	WriteTimeout time.Duration
+	IdleTimeout  time.Duration
+	PoolSize     int
+	PoolTimeout  time.Duration
+	RegisterKey  string
 }
 
 type NodeConfig struct {
@@ -30,28 +30,50 @@ type NodeConfig struct {
 }
 
 type Client struct {
-	mu       sync.RWMutex
-	nodePool map[string]*redis.Pool
-	nodeArr  []string
-	nodeLen  uint64
-	config   Config
-	etcd     etcdV2.KeysAPI
+	mu          sync.RWMutex
+	nodePool    map[string]*redis.Client
+	nodeArr     []string
+	nodeLen     uint64
+	options     redis.Options
+	registerKey string
+	etcd        etcdV2.KeysAPI
 }
 
 func NewClient(config Config, clientV2 etcdV2.Client) *Client {
-	return &Client{
-		nodePool: make(map[string]*redis.Pool),
-		nodeArr:  make([]string, 0),
-		etcd:     etcdV2.NewKeysAPI(clientV2),
-		config:   config,
+	client := &Client{
+		nodePool:    make(map[string]*redis.Client),
+		nodeArr:     make([]string, 0),
+		etcd:        etcdV2.NewKeysAPI(clientV2),
+		registerKey: config.RegisterKey,
+		options: redis.Options{
+			DB: config.DB,
+		},
 	}
+	if config.DialTimeout != 0 {
+		client.options.DialTimeout = config.DialTimeout
+	}
+	if config.ReadTimeout != 0 {
+		client.options.ReadTimeout = config.ReadTimeout
+	}
+	if config.WriteTimeout != 0 {
+		client.options.WriteTimeout = config.WriteTimeout
+	}
+	if config.IdleTimeout != 0 {
+		client.options.IdleTimeout = config.IdleTimeout
+	}
+	if config.PoolSize != 0 {
+		client.options.PoolSize = config.PoolSize
+	}
+	if config.PoolTimeout != 0 {
+		client.options.PoolTimeout = config.PoolTimeout
+	}
+	return client
 }
 
 func (c *Client) Init() error {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
-	//c.etcd.Put(ctx, "/test", "212")
-	res, err := c.etcd.Get(ctx, c.config.RegisterKey,
+	res, err := c.etcd.Get(ctx, c.registerKey,
 		&etcdV2.GetOptions{Recursive: true},
 	)
 	if err != nil {
@@ -62,7 +84,6 @@ func (c *Client) Init() error {
 		if err := json.Unmarshal([]byte(node.Value), &nodeConfig); err != nil {
 			continue
 		}
-		fmt.Println(nodeConfig.Pwd)
 		c.addRedisPool(nodeConfig)
 	}
 
@@ -70,14 +91,14 @@ func (c *Client) Init() error {
 	return nil
 }
 
-func (c *Client) GetConn() redis.Conn {
+func (c *Client) GetClient() *redis.Client {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
 	if c.nodeLen == 0 {
 		return nil
 	}
 	index := rand.Uint64() % c.nodeLen
-	return c.nodePool[c.nodeArr[index]].Get()
+	return c.nodePool[c.nodeArr[index]]
 }
 
 func (c *Client) addRedisPool(node NodeConfig) {
@@ -88,22 +109,11 @@ func (c *Client) addRedisPool(node NodeConfig) {
 	}
 	c.nodeLen++
 	c.nodeArr = append(c.nodeArr, node.Token)
-	c.nodePool[node.Token] = &redis.Pool{
-		MaxIdle:     c.config.MaxIdle,
-		MaxActive:   c.config.MaxActive,
-		IdleTimeout: c.config.IdleTimeOut,
-		Dial: func() (redis.Conn, error) {
-			c, err := redis.Dial(node.ProtoType, node.ProxyAddr)
-			return c, err
-		},
-		TestOnBorrow: func(c redis.Conn, t time.Time) error {
-			_, err := c.Do("PING")
-			if err != nil {
-				println("TestOnBorrow", err)
-			}
-			return err
-		},
-	}
+	var options redis.Options
+	options = c.options
+	options.Network = node.ProtoType
+	options.Addr = node.ProxyAddr
+	c.nodePool[node.Token] = redis.NewClient(&options)
 }
 
 func (c *Client) removeRedisPool(node NodeConfig) {
@@ -126,7 +136,7 @@ func (c *Client) removeRedisPool(node NodeConfig) {
 
 func (c *Client) watch() {
 	// watch key 监听节点
-	watcher := c.etcd.Watcher(c.config.RegisterKey, &etcdV2.WatcherOptions{Recursive: true})
+	watcher := c.etcd.Watcher(c.registerKey, &etcdV2.WatcherOptions{Recursive: true})
 	for {
 		resp, err := watcher.Next(context.Background())
 		if err != nil {

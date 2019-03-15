@@ -1,4 +1,4 @@
-package codis_cli
+package codis_cli_redigo
 
 import (
 	"fmt"
