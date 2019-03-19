@@ -3,7 +3,6 @@ package kafka
 import (
 	"github.com/Shopify/sarama"
 	"github.com/bsm/sarama-cluster"
-	"go.uber.org/zap"
 	"time"
 )
 
@@ -58,7 +57,7 @@ func (c *ClusterConsumer) dial() (err error) {
 			return
 		}
 
-		Log.Warn("NewSyncProducer fault", zap.Uint32("time", i), zap.Error(err))
+		sarama.Logger.Printf("new cluster consumer fault times(%d) error(%v)", i, err)
 		time.Sleep(time.Second)
 	}
 	return
@@ -71,7 +70,7 @@ func (c *ClusterConsumer) notificationProcess(deal clusterNtyHandle) {
 		if !ok {
 			return
 		}
-		Log.Debug("kafka cluster consumer notification send", zap.Any("notify", ntf))
+		sarama.Logger.Printf("kafka cluster consumer notification(%v)", ntf)
 		if deal != nil {
 			deal(ntf)
 		}
@@ -85,7 +84,7 @@ func (c *ClusterConsumer) errProcess(deal clusterErrHandle) {
 		if !ok {
 			return
 		}
-		Log.Error("kafka cluster consumer", zap.Any("group_id", c.conf.GroupId), zap.Error(e))
+		sarama.Logger.Printf("kafka cluster consumer group_id(%d) error(%v)", c.conf.GroupId, e)
 		if deal != nil {
 			deal(e)
 		}

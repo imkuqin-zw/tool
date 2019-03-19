@@ -3,7 +3,6 @@ package kafka
 import (
 	"context"
 	"github.com/Shopify/sarama"
-	"go.uber.org/zap"
 	"time"
 )
 
@@ -53,7 +52,7 @@ func (p *Producer) syncDial() (err error) {
 		if p.SyncProducer, err = sarama.NewSyncProducer(p.conf.Brokers, config); err == nil {
 			return
 		}
-		Log.Warn("NewSyncProducer fault", zap.Uint32("time", i), zap.Error(err))
+		sarama.Logger.Printf("new sync producer fault times(%d) error(%v)", i, err)
 		time.Sleep(time.Second)
 	}
 	return
@@ -72,7 +71,7 @@ func (p *Producer) asyncDial() (err error) {
 			go p.successProcess(p.sucDeal)
 			break
 		}
-		Log.Warn("NewAsyncProducer fault", zap.Uint32("time", i), zap.Error(err))
+		sarama.Logger.Printf("new async producer fault times(%d) error(%v)", i, err)
 		time.Sleep(time.Second)
 	}
 	return
@@ -85,7 +84,7 @@ func (p *Producer) errProcess(deal errHandle) {
 		if !ok {
 			return
 		}
-		Log.Error("kafka producer send message failed error", zap.Any("e.msg", e.Msg), zap.Error(e.Err))
+		sarama.Logger.Printf("kafka producer send message(%v) failed error(%v)", e.Msg, e.Err)
 		if deal != nil {
 			deal(e)
 		}
@@ -99,7 +98,7 @@ func (p *Producer) successProcess(deal sucHandle) {
 		if !ok {
 			return
 		}
-		Log.Debug("kafka producer send message sucsess", zap.Any("msg", msg))
+		sarama.Logger.Printf("kafka producer send message(%v) sucsess", msg)
 		if deal != nil {
 			deal(msg)
 		}
@@ -112,7 +111,7 @@ func (p *Producer) Input(c context.Context, msg *sarama.ProducerMessage) (err er
 		p.AsyncProducer.Input() <- msg
 	} else {
 		if _, _, err = p.SyncProducer.SendMessage(msg); err != nil {
-			Log.Error("Input", zap.Error(err))
+			sarama.Logger.Print("syncProducer send msg(%v) fault error(%v): ", msg, err)
 		}
 	}
 	return
