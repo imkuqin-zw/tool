@@ -4,8 +4,11 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"net"
+	"os"
 	"strings"
 )
+
 type Errno struct {
 	status int
 }
@@ -50,4 +53,73 @@ func splitRemoteFileId(remoteFileId string) ([]string, error) {
 		return nil, errors.New("error remoteFileId")
 	}
 	return parts, nil
+}
+
+func TcpSendData(conn net.Conn, bytesStream []byte) error {
+	if _, err := conn.Write(bytesStream); err != nil {
+		return err
+	}
+	return nil
+}
+
+func TcpSendFile(conn net.Conn, filename string) error {
+	file, err := os.Open(filename)
+	defer file.Close()
+	if err != nil {
+		return err
+	}
+
+	var fileSize int64 = 0
+	if fileInfo, err := file.Stat(); err == nil {
+		fileSize = fileInfo.Size()
+	}
+
+	if fileSize == 0 {
+		errmsg := fmt.Sprintf("file size is zeor [%s]", filename)
+		return errors.New(errmsg)
+	}
+
+	fileBuffer := make([]byte, fileSize)
+
+	_, err = file.Read(fileBuffer)
+	if err != nil {
+		return err
+	}
+
+	return TcpSendData(conn, fileBuffer)
+}
+
+func TcpRecvResponse(conn net.Conn, bufferSize int64) ([]byte, int64, error) {
+	recvBuff := make([]byte, 0, bufferSize)
+	tmp := make([]byte, 256)
+	var total int64
+	for {
+		n, err := conn.Read(tmp)
+		total += int64(n)
+		recvBuff = append(recvBuff, tmp[:n]...)
+		if err != nil {
+			if err != io.EOF {
+				return nil, 0, err
+			}
+			break
+		}
+		if total == bufferSize {
+			break
+		}
+	}
+	return recvBuff, total, nil
+}
+
+func TcpRecvFile(conn net.Conn, localFilename string, bufferSize int64) (int64, error) {
+	file, err := os.Create(localFilename)
+	defer file.Close()
+	if err != nil {
+		return 0, err
+	}
+
+	recvBuff, total, err := TcpRecvResponse(conn, bufferSize)
+	if _, err := file.Write(recvBuff); err != nil {
+		return 0, err
+	}
+	return total, nil
 }

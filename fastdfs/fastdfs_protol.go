@@ -5,41 +5,10 @@ import (
 	"encoding/binary"
 	"errors"
 	"io"
-	"net"
 	"os"
 )
 
 const (
-	TRACKER_PROTO_CMD_STORAGE_JOIN              = 81
-	FDFS_PROTO_CMD_QUIT                         = 82
-	TRACKER_PROTO_CMD_STORAGE_BEAT              = 83 //storage heart beat
-	TRACKER_PROTO_CMD_STORAGE_REPORT_DISK_USAGE = 84 //report disk usage
-	TRACKER_PROTO_CMD_STORAGE_REPLICA_CHG       = 85 //repl new storage servers
-	TRACKER_PROTO_CMD_STORAGE_SYNC_SRC_REQ      = 86 //src storage require sync
-	TRACKER_PROTO_CMD_STORAGE_SYNC_DEST_REQ     = 87 //dest storage require sync
-	TRACKER_PROTO_CMD_STORAGE_SYNC_NOTIFY       = 88 //sync done notify
-	TRACKER_PROTO_CMD_STORAGE_SYNC_REPORT       = 89 //report src last synced time as dest server
-	TRACKER_PROTO_CMD_STORAGE_SYNC_DEST_QUERY   = 79 //dest storage query sync src storage server
-	TRACKER_PROTO_CMD_STORAGE_REPORT_IP_CHANGED = 78 //storage server report it's ip changed
-	TRACKER_PROTO_CMD_STORAGE_CHANGELOG_REQ     = 77 //storage server request storage server's changelog
-	TRACKER_PROTO_CMD_STORAGE_REPORT_STATUS     = 76 //report specified storage server status
-	TRACKER_PROTO_CMD_STORAGE_PARAMETER_REQ     = 75 //storage server request parameters
-	TRACKER_PROTO_CMD_STORAGE_REPORT_TRUNK_FREE = 74 //storage report trunk free space
-	TRACKER_PROTO_CMD_STORAGE_REPORT_TRUNK_FID  = 73 //storage report current trunk file id
-	TRACKER_PROTO_CMD_STORAGE_FETCH_TRUNK_FID   = 72 //storage get current trunk file id
-
-	TRACKER_PROTO_CMD_TRACKER_GET_SYS_FILES_START = 61 //start of tracker get system data files
-	TRACKER_PROTO_CMD_TRACKER_GET_SYS_FILES_END   = 62 //end of tracker get system data files
-	TRACKER_PROTO_CMD_TRACKER_GET_ONE_SYS_FILE    = 63 //tracker get a system data file
-	TRACKER_PROTO_CMD_TRACKER_GET_STATUS          = 64 //tracker get status of other tracker
-	TRACKER_PROTO_CMD_TRACKER_PING_LEADER         = 65 //tracker ping leader
-	TRACKER_PROTO_CMD_TRACKER_NOTIFY_NEXT_LEADER  = 66 //notify next leader to other trackers
-	TRACKER_PROTO_CMD_TRACKER_COMMIT_NEXT_LEADER  = 67 //commit next leader to other trackers
-
-	TRACKER_PROTO_CMD_SERVER_LIST_ONE_GROUP                 = 90
-	TRACKER_PROTO_CMD_SERVER_LIST_ALL_GROUPS                = 91
-	TRACKER_PROTO_CMD_SERVER_LIST_STORAGE                   = 92
-	TRACKER_PROTO_CMD_SERVER_DELETE_STORAGE                 = 93
 	TRACKER_PROTO_CMD_SERVICE_QUERY_STORE_WITHOUT_GROUP_ONE = 101
 	TRACKER_PROTO_CMD_SERVICE_QUERY_FETCH_ONE               = 102
 	TRACKER_PROTO_CMD_SERVICE_QUERY_UPDATE                  = 103
@@ -165,9 +134,9 @@ type StorageServer struct {
 }
 
 type trackerHeader struct {
-	pkgLen int64
 	cmd    int8
 	status int8
+	pkgLen int64
 }
 
 func (this *trackerHeader) marshal() ([]byte, error) {
@@ -191,15 +160,17 @@ func (this *trackerHeader) unmarshal(data []byte) error {
 	return nil
 }
 
-func (this *trackerHeader) sendHeader(conn net.Conn) {
+func (this *trackerHeader) sendHeader(conn *ConnNode) (err error) {
 	buf, _ := this.marshal()
-	conn.Write(buf)
+	_, err = conn.c.Write(buf)
+	return
 }
 
-func (this *trackerHeader) recvHeader(conn net.Conn) {
+func (this *trackerHeader) recvHeader(conn *ConnNode) {
 	buf := make([]byte, 10)
-	_, err := io.ReadFull(conn, buf)
+	_, err := io.ReadFull(conn.c, buf)
 	if err != nil {
+
 		return
 	}
 
