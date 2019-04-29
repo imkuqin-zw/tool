@@ -1,7 +1,6 @@
 package fastdfs
 
 import (
-	"net"
 	"time"
 )
 
@@ -11,14 +10,10 @@ type connList struct {
 }
 
 type ConnNode struct {
-	c       net.Conn
-	t       time.Time
-	created time.Time
+	c          *conn
+	t          time.Time
+	created    time.Time
 	prev, next *ConnNode
-}
-
-func (cn *ConnNode) Conn() net.Conn {
-	return cn.c
 }
 
 func (l *connList) pushFront(cn *ConnNode) {

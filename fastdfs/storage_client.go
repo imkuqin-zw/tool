@@ -3,7 +3,7 @@ package fastdfs
 import (
 	"errors"
 	"fmt"
-	"github.com/imkuqin-zw/ZWChat/common/logger"
+	"go.uber.org/zap"
 	"net"
 	"os"
 )
@@ -12,8 +12,7 @@ type StorageClient struct {
 	pool Pool
 }
 
-func (this *StorageClient) storageUploadByFilename(tc *TrackerClient,
-	storeServ *StorageServer, filename string) (*UploadFileResponse, error) {
+func (this *StorageClient) uploadByFilename(storeSvr *StorageSvr, filename string) (*UploadFileResp, error) {
 	fileInfo, err := os.Stat(filename)
 	if err != nil {
 		return nil, err
@@ -22,20 +21,18 @@ func (this *StorageClient) storageUploadByFilename(tc *TrackerClient,
 	fileSize := fileInfo.Size()
 	fileExtName := getFileExt(filename)
 
-	return this.storageUploadFile(tc, storeServ, filename, int64(fileSize), FDFS_UPLOAD_BY_FILENAME,
+	return this.uploadFile(storeSvr, filename, int64(fileSize), FDFS_UPLOAD_BY_FILENAME,
 		STORAGE_PROTO_CMD_UPLOAD_FILE, "", "", fileExtName)
 }
 
-func (this *StorageClient) storageUploadByBuffer(tc *TrackerClient,
-	storeServ *StorageServer, fileBuffer []byte, fileExtName string) (*UploadFileResponse, error) {
-	bufferSize := len(fileBuffer)
-
-	return this.storageUploadFile(tc, storeServ, fileBuffer, int64(bufferSize), FDFS_UPLOAD_BY_BUFFER,
+func (this *StorageClient) uploadByBuffer(storeSvr *StorageSvr, fileBuffer []byte,
+	fileExtName string) (*UploadFileResp, error) {
+	return this.uploadFile(storeSvr, fileBuffer, int64(len(fileBuffer)), FDFS_UPLOAD_BY_BUFFER,
 		STORAGE_PROTO_CMD_UPLOAD_FILE, "", "", fileExtName)
 }
 
-func (this *StorageClient) storageUploadSlaveByFilename(tc *TrackerClient,
-	storeServ *StorageServer, filename string, prefixName string, remoteFileId string) (*UploadFileResponse, error) {
+func (this *StorageClient) uploadSlaveByFilename(storeSvr *StorageSvr, filename string,
+	prefixName string, remoteFileId string) (*UploadFileResp, error) {
 	fileInfo, err := os.Stat(filename)
 	if err != nil {
 		return nil, err
@@ -44,20 +41,18 @@ func (this *StorageClient) storageUploadSlaveByFilename(tc *TrackerClient,
 	fileSize := fileInfo.Size()
 	fileExtName := getFileExt(filename)
 
-	return this.storageUploadFile(tc, storeServ, filename, int64(fileSize), FDFS_UPLOAD_BY_FILENAME,
+	return this.uploadFile(storeSvr, filename, int64(fileSize), FDFS_UPLOAD_BY_FILENAME,
 		STORAGE_PROTO_CMD_UPLOAD_SLAVE_FILE, remoteFileId, prefixName, fileExtName)
 }
 
-func (this *StorageClient) storageUploadSlaveByBuffer(tc *TrackerClient,
-	storeServ *StorageServer, fileBuffer []byte, remoteFileId string, fileExtName string) (*UploadFileResponse, error) {
-	bufferSize := len(fileBuffer)
+func (this *StorageClient) uploadSlaveByBuffer(storeSvr *StorageSvr, fileBuffer []byte,
+	remoteFileId string, fileExtName string) (*UploadFileResp, error) {
 
-	return this.storageUploadFile(tc, storeServ, fileBuffer, int64(bufferSize), FDFS_UPLOAD_BY_BUFFER,
+	return this.uploadFile(storeSvr, fileBuffer, int64(len(fileBuffer)), FDFS_UPLOAD_BY_BUFFER,
 		STORAGE_PROTO_CMD_UPLOAD_SLAVE_FILE, "", remoteFileId, fileExtName)
 }
 
-func (this *StorageClient) storageUploadAppenderByFilename(tc *TrackerClient,
-	storeServ *StorageServer, filename string) (*UploadFileResponse, error) {
+func (this *StorageClient) uploadAppenderByFilename(storeSvr *StorageSvr, filename string) (*UploadFileResp, error) {
 	fileInfo, err := os.Stat(filename)
 	if err != nil {
 		return nil, err
@@ -66,52 +61,51 @@ func (this *StorageClient) storageUploadAppenderByFilename(tc *TrackerClient,
 	fileSize := fileInfo.Size()
 	fileExtName := getFileExt(filename)
 
-	return this.storageUploadFile(tc, storeServ, filename, int64(fileSize), FDFS_UPLOAD_BY_FILENAME,
+	return this.uploadFile(storeSvr, filename, int64(fileSize), FDFS_UPLOAD_BY_FILENAME,
 		STORAGE_PROTO_CMD_UPLOAD_APPENDER_FILE, "", "", fileExtName)
 }
 
-func (this *StorageClient) storageUploadAppenderByBuffer(tc *TrackerClient,
-	storeServ *StorageServer, fileBuffer []byte, fileExtName string) (*UploadFileResponse, error) {
+func (this *StorageClient) uploadAppenderByBuffer(storeSvr *StorageSvr, fileBuffer []byte,
+	fileExtName string) (*UploadFileResp, error) {
 	bufferSize := len(fileBuffer)
 
-	return this.storageUploadFile(tc, storeServ, fileBuffer, int64(bufferSize), FDFS_UPLOAD_BY_BUFFER,
+	return this.uploadFile(storeSvr, fileBuffer, int64(bufferSize), FDFS_UPLOAD_BY_BUFFER,
 		STORAGE_PROTO_CMD_UPLOAD_APPENDER_FILE, "", "", fileExtName)
 }
 
-func (this *StorageClient) storageUploadFile(tc *TrackerClient,
-	storeServ *StorageServer, fileContent interface{}, fileSize int64, uploadType int,
-	cmd int8, masterFilename string, prefixName string, fileExtName string) (*UploadFileResponse, error) {
+func (this *StorageClient) uploadFile(storeSvr *StorageSvr, fileContent interface{}, fileSize int64,
+	uploadType int, cmd int8, masterFilename string, prefixName string, fileExtName string) (*UploadFileResp, error) {
 
 	var (
-		connNode    *ConnNode
-		conn        net.Conn
 		uploadSlave bool
 		headerLen   int64 = 15
 		reqBuf      []byte
-		err         error
 	)
-
-	connNode, err = this.pool.Get()
+	connNode, err := this.pool.Get()
 	if err != nil {
 		return nil, err
 	}
-	conn = connNode.Conn()
-	defer conn.Close()
+	conn := connNode.c
 
+	//request header
 	masterFilenameLen := int64(len(masterFilename))
-	if len(storeServ.groupName) > 0 && len(masterFilename) > 0 {
+	if len(storeSvr.groupName) > 0 && len(masterFilename) > 0 {
 		uploadSlave = true
 		// #slave_fmt |-master_len(8)-file_size(8)-prefix_name(16)-file_ext_name(6)
 		//       #           -master_name(master_filename_len)-|
 		headerLen = int64(38) + masterFilenameLen
 	}
+	h := &header{
+		pkgLen: headerLen + int64(fileSize),
+		cmd:    cmd,
+	}
+	if err := conn.WriteHeader(h); err != nil {
+		this.pool.Put(connNode, true)
+		Logger.Error("write header fault", zap.Error(err))
+		return nil, err
+	}
 
-	th := &trackerHeader{}
-	th.pkgLen = headerLen
-	th.pkgLen += int64(fileSize)
-	th.cmd = cmd
-	th.sendHeader(conn)
-
+	// request body
 	if uploadSlave {
 		req := &uploadSlaveFileRequest{}
 		req.masterFilenameLen = masterFilenameLen
@@ -119,55 +113,91 @@ func (this *StorageClient) storageUploadFile(tc *TrackerClient,
 		req.prefixName = prefixName
 		req.fileExtName = fileExtName
 		req.masterFilename = masterFilename
-		reqBuf, err = req.marshal()
+		reqBuf = req.marshal()
 	} else {
 		req := &uploadFileRequest{}
-		req.storePathIndex = uint8(storeServ.storePathIndex)
+		req.storePathIndex = uint8(storeSvr.storePathIndex)
 		req.fileSize = int64(fileSize)
 		req.fileExtName = fileExtName
-		reqBuf, err = req.marshal()
+		reqBuf = req.marshal()
 	}
-	if err != nil {
-		logger.Warnf("uploadFileRequest.marshal error :%s", err.Error())
+	if err = conn.Write(reqBuf); err != nil {
+		this.pool.Put(connNode, true)
+		Logger.Error("write body fault", zap.Error(err))
 		return nil, err
 	}
-	TcpSendData(conn, reqBuf)
 
+	var filebuf []byte
 	switch uploadType {
 	case FDFS_UPLOAD_BY_FILENAME:
 		if filename, ok := fileContent.(string); ok {
-			err = TcpSendFile(conn, filename)
+			filebuf, err = GetFileData(filename)
+			if err != nil {
+				this.pool.Put(connNode, true)
+				Logger.Error("get file data fault", zap.Error(err))
+				return nil, err
+			}
+		} else {
+			this.pool.Put(connNode, true)
+			Logger.Error("fileContent type fault")
+			return nil, errors.New("fileContent type fault")
 		}
-	case FDFS_DOWNLOAD_TO_BUFFER:
+	case FDFS_UPLOAD_BY_BUFFER:
 		if fileBuffer, ok := fileContent.([]byte); ok {
-			err = TcpSendData(conn, fileBuffer)
+			filebuf = fileBuffer
+		} else {
+			this.pool.Put(connNode, true)
+			Logger.Error("fileContent type fault")
+			return nil, errors.New("fileContent type fault")
 		}
+	default:
+		this.pool.Put(connNode, true)
+		Logger.Error("upload type not be defined")
+		return nil, errors.New("upload type not be defined")
 	}
-	if err != nil {
-		logger.Warnf(err.Error())
+	if err = conn.Write(filebuf); err != nil {
+		this.pool.Put(connNode, true)
+		Logger.Error("write file data fault", zap.Error(err))
 		return nil, err
 	}
 
-	th.recvHeader(conn)
-	if th.status != 0 {
-		return nil, Errno{int(th.status)}
+	// respose header
+	if h, err = conn.ReadHeader(); err != nil {
+		this.pool.Put(connNode, true)
+		Logger.Error("read header fault", zap.Error(err))
+		return nil, err
 	}
-	recvBuff, recvSize, err := TcpRecvResponse(conn, th.pkgLen)
-	if recvSize <= int64(FDFS_GROUP_NAME_MAX_LEN) {
-		errmsg := "[-] Error: Storage response length is not match, "
-		errmsg += fmt.Sprintf("expect: %d, actual: %d", th.pkgLen, recvSize)
-		logger.Warn(errmsg)
-		return nil, errors.New(errmsg)
-	}
-	ur := &UploadFileResponse{}
-	err = ur.unmarshal(recvBuff)
-	if err != nil {
-		errmsg := fmt.Sprintf("recvBuf can not unmarshal :%s", err.Error())
-		logger.Warn(errmsg)
-		return nil, errors.New(errmsg)
+	if h.status != 0 {
+		this.pool.Put(connNode, false)
+		return nil, Errno{int(h.status)}
 	}
 
+	//　response body
+	rspBuf, err := conn.ReadN(h.pkgLen)
+	if err != nil {
+		this.pool.Put(connNode, true)
+		Logger.Error("read body fault", zap.Error(err))
+		return nil, err
+	}
+	this.pool.Put(connNode, false)
+	ur := &UploadFileResp{}
+	if err = ur.unmarshal(rspBuf); err != nil {
+		Logger.Error("recvBuf can not unmarshal", zap.Error(err))
+		return nil, err
+	}
 	return ur, nil
+}
+
+func (this *StorageClient) appendByFilename() {
+
+}
+
+func (this *StorageClient) appendByBuffer() {
+
+}
+
+func (this *StorageSvr) appendFile(groupName string, appenderFileName string, fileSize int64) {
+
 }
 
 func (this *StorageClient) storageDeleteFile(tc *TrackerClient, storeServ *StorageServer, remoteFilename string) error {

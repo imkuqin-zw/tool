@@ -9,21 +9,6 @@ import (
 	"strings"
 )
 
-type Errno struct {
-	status int
-}
-
-func (e Errno) Error() string {
-	errmsg := fmt.Sprintf("errno [%d] ", e.status)
-	switch e.status {
-	case 17:
-		errmsg += "File Exist"
-	case 22:
-		errmsg += "Argument Invlid"
-	}
-	return errmsg
-}
-
 func readCstr(buff io.Reader, length int) (string, error) {
 	str := make([]byte, length)
 	n, err := buff.Read(str)
@@ -62,13 +47,12 @@ func TcpSendData(conn net.Conn, bytesStream []byte) error {
 	return nil
 }
 
-func TcpSendFile(conn net.Conn, filename string) error {
+func GetFileData(filename string) ([]byte, error) {
 	file, err := os.Open(filename)
 	defer file.Close()
 	if err != nil {
-		return err
+		return nil, err
 	}
-
 	var fileSize int64 = 0
 	if fileInfo, err := file.Stat(); err == nil {
 		fileSize = fileInfo.Size()
@@ -76,17 +60,16 @@ func TcpSendFile(conn net.Conn, filename string) error {
 
 	if fileSize == 0 {
 		errmsg := fmt.Sprintf("file size is zeor [%s]", filename)
-		return errors.New(errmsg)
+		return nil, errors.New(errmsg)
 	}
 
 	fileBuffer := make([]byte, fileSize)
 
 	_, err = file.Read(fileBuffer)
 	if err != nil {
-		return err
+		return nil, err
 	}
-
-	return TcpSendData(conn, fileBuffer)
+	return fileBuffer, nil
 }
 
 func TcpRecvResponse(conn net.Conn, bufferSize int64) ([]byte, int64, error) {

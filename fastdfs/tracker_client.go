@@ -4,74 +4,78 @@ import (
 	"bytes"
 	"encoding/binary"
 	"go.uber.org/zap"
-	"net"
 )
 
 type TrackerClient struct {
 	pool Pool
-	log  *zap.Logger
 }
 
-func (this *TrackerClient) trackerQueryStorageStoreWithoutGroup() (*StorageServer, error) {
-	var (
-		connNode *ConnNode
-		conn     net.Conn
-		recvBuff []byte
-		err      error
-	)
-
-	connNode, err = this.pool.Get()
+func (this *TrackerClient) trackerQueryStorageStoreWithoutGroup() (*StorageSvr, error) {
+	connNode, err := this.pool.Get()
 	if err != nil {
+		Logger.Error("get conn fault", zap.Error(err))
 		return nil, err
 	}
-	conn = connNode.c
+	conn := connNode.c
 
-	th := &trackerHeader{}
-	th.cmd = TRACKER_PROTO_CMD_SERVICE_QUERY_STORE_WITHOUT_GROUP_ONE
-	th.sendHeader(connNode)
-	th.recvHeader(conn)
-	if th.status != 0 {
-		return nil, Errno{int(th.status)}
+	// request header
+	h := &header{
+		cmd: TRACKER_PROTO_CMD_SERVICE_QUERY_STORE_WITHOUT_GROUP_ONE,
 	}
-
-	var (
-		groupName      string
-		ipAddr         string
-		port           int64
-		storePathIndex uint8
-	)
-	recvBuff, _, err = TcpRecvResponse(conn, th.pkgLen)
-	if err != nil {
-		this.log.Error("TcpRecvResponse error", zap.Error(err))
+	if err := conn.WriteHeader(h); err != nil {
+		this.pool.Put(connNode, true)
+		Logger.Error("write header fault", zap.Error(err))
 		return nil, err
 	}
-	buff := bytes.NewBuffer(recvBuff)
-	// #recv_fmt |-group_name(16)-ipaddr(16-1)-port(8)-store_path_index(1)|
-	groupName, err = readCstr(buff, FDFS_GROUP_NAME_MAX_LEN)
-	ipAddr, err = readCstr(buff, IP_ADDRESS_SIZE-1)
-	binary.Read(buff, binary.BigEndian, &port)
-	binary.Read(buff, binary.BigEndian, &storePathIndex)
-	return &StorageServer{ipAddr, int(port), groupName, int(storePathIndex)}, nil
+
+	// response header
+	if h, err = conn.ReadHeader(); err != nil {
+		this.pool.Put(connNode, true)
+		Logger.Error("read header fault", zap.Error(err))
+		return nil, err
+	}
+	if h.status != 0 {
+		this.pool.Put(connNode, false)
+		return nil, Errno{int(h.status)}
+	}
+
+	// response body
+	rspBuf, err := conn.ReadN(h.pkgLen)
+	if err != nil {
+		this.pool.Put(connNode, true)
+		Logger.Error("read body fault", zap.Error(err))
+		return nil, err
+	}
+	this.pool.Put(connNode, false)
+	svr := &StorageSvr{}
+	buff := bytes.NewBuffer(rspBuf)
+	svr.groupName, _ = readCstr(buff, FDFS_GROUP_NAME_MAX_LEN)
+	svr.ipAddr, _ = readCstr(buff, IP_ADDRESS_SIZE-1)
+	binary.Read(buff, binary.BigEndian, &svr.port)
+	binary.Read(buff, binary.BigEndian, &svr.storePathIndex)
+	return svr, nil
 }
 
-func (this *TrackerClient) trackerQueryStorageStorWithGroup(groupName string) (*StorageServer, error) {
-	var (
-		conn     net.Conn
-		recvBuff []byte
-		err      error
-	)
-
-	conn, err = this.pool.Get()
-	defer conn.Close()
+func (this *TrackerClient) trackerQueryStorageStorWithGroup(groupName string) (*StorageSvr, error) {
+	connNode, err := this.pool.Get()
 	if err != nil {
+		Logger.Error("get conn fault", zap.Error(err))
+		return nil, err
+	}
+	conn := connNode.c
+
+	// request header
+	h := &header{
+		cmd:    TRACKER_PROTO_CMD_SERVICE_QUERY_STORE_WITH_GROUP_ONE,
+		pkgLen: int64(FDFS_GROUP_NAME_MAX_LEN),
+	}
+	if err := conn.WriteHeader(h); err != nil {
+		this.pool.Put(connNode, true)
+		Logger.Error("write header fault", zap.Error(err))
 		return nil, err
 	}
 
-	th := &trackerHeader{}
-	th.cmd = TRACKER_PROTO_CMD_SERVICE_QUERY_STORE_WITH_GROUP_ONE
-	th.pkgLen = int64(FDFS_GROUP_NAME_MAX_LEN)
-	th.sendHeader(conn)
-
+	// request body
 	groupBuffer := new(bytes.Buffer)
 	// 16 bit groupName
 	groupNameBytes := bytes.NewBufferString(groupName).Bytes()
@@ -83,62 +87,66 @@ func (this *TrackerClient) trackerQueryStorageStorWithGroup(groupName string) (*
 		}
 	}
 	groupBytes := groupBuffer.Bytes()
-
-	err = TcpSendData(conn, groupBytes)
-	if err != nil {
+	if err = conn.Write(groupBytes); err != nil {
+		this.pool.Put(connNode, true)
+		Logger.Error("write body fault", zap.Error(err))
 		return nil, err
 	}
 
-	th.recvHeader(conn)
-	if th.status != 0 {
-		logger.Warnf("recvHeader error [%d]", th.status)
-		return nil, Errno{int(th.status)}
-	}
-
-	var (
-		ipAddr         string
-		port           int64
-		storePathIndex uint8
-	)
-	recvBuff, _, err = TcpRecvResponse(conn, th.pkgLen)
-	if err != nil {
-		logger.Warnf("TcpRecvResponse error :%s", err.Error())
+	// response header
+	if h, err = conn.ReadHeader(); err != nil {
+		this.pool.Put(connNode, true)
+		Logger.Error("read header fault", zap.Error(err))
 		return nil, err
 	}
-	buff := bytes.NewBuffer(recvBuff)
-	// #recv_fmt |-group_name(16)-ipaddr(16-1)-port(8)-store_path_index(1)|
-	groupName, err = readCstr(buff, FDFS_GROUP_NAME_MAX_LEN)
-	ipAddr, err = readCstr(buff, IP_ADDRESS_SIZE-1)
-	binary.Read(buff, binary.BigEndian, &port)
-	binary.Read(buff, binary.BigEndian, &storePathIndex)
-	return &StorageServer{ipAddr, int(port), groupName, int(storePathIndex)}, nil
+	if h.status != 0 {
+		this.pool.Put(connNode, false)
+		return nil, Errno{int(h.status)}
+	}
+
+	//　response body
+	rspBuf, err := conn.ReadN(h.pkgLen)
+	if err != nil {
+		this.pool.Put(connNode, true)
+		Logger.Error("read body fault", zap.Error(err))
+		return nil, err
+	}
+	this.pool.Put(connNode, false)
+	svr := &StorageSvr{}
+	buff := bytes.NewBuffer(rspBuf)
+	svr.groupName, _ = readCstr(buff, FDFS_GROUP_NAME_MAX_LEN)
+	svr.ipAddr, _ = readCstr(buff, IP_ADDRESS_SIZE-1)
+	binary.Read(buff, binary.BigEndian, &svr.port)
+	binary.Read(buff, binary.BigEndian, &svr.storePathIndex)
+	return svr, nil
 }
 
-func (this *TrackerClient) trackerQueryStorageUpdate(groupName string, remoteFilename string) (*StorageServer, error) {
+func (this *TrackerClient) trackerQueryStorageUpdate(groupName string, remoteFilename string) (*StorageSvr, error) {
 	return this.trackerQueryStorage(groupName, remoteFilename, TRACKER_PROTO_CMD_SERVICE_QUERY_UPDATE)
 }
 
-func (this *TrackerClient) trackerQueryStorageFetch(groupName string, remoteFilename string) (*StorageServer, error) {
+func (this *TrackerClient) trackerQueryStorageFetch(groupName string, remoteFilename string) (*StorageSvr, error) {
 	return this.trackerQueryStorage(groupName, remoteFilename, TRACKER_PROTO_CMD_SERVICE_QUERY_FETCH_ONE)
 }
 
-func (this *TrackerClient) trackerQueryStorage(groupName string, remoteFilename string, cmd int8) (*StorageServer, error) {
-	var (
-		conn     net.Conn
-		recvBuff []byte
-		err      error
-	)
-
-	conn, err = this.pool.Get()
-	defer conn.Close()
+func (this *TrackerClient) trackerQueryStorage(groupName string, remoteFilename string, cmd int8) (*StorageSvr, error) {
+	connNode, err := this.pool.Get()
 	if err != nil {
+		Logger.Error("get conn fault", zap.Error(err))
 		return nil, err
 	}
+	conn := connNode.c
 
-	th := &trackerHeader{}
-	th.pkgLen = int64(FDFS_GROUP_NAME_MAX_LEN + len(remoteFilename))
-	th.cmd = cmd
-	th.sendHeader(conn)
+	// request header
+	h := &header{
+		cmd:    cmd,
+		pkgLen: int64(FDFS_GROUP_NAME_MAX_LEN + len(remoteFilename)),
+	}
+	if err := conn.WriteHeader(h); err != nil {
+		this.pool.Put(connNode, true)
+		Logger.Error("write header fault", zap.Error(err))
+		return nil, err
+	}
 
 	// #query_fmt: |-group_name(16)-filename(file_name_len)-|
 	queryBuffer := new(bytes.Buffer)
@@ -156,32 +164,37 @@ func (this *TrackerClient) trackerQueryStorage(groupName string, remoteFilename 
 	for i := 0; i < len(remoteFilenameBytes); i++ {
 		queryBuffer.WriteByte(remoteFilenameBytes[i])
 	}
-	err = TcpSendData(conn, queryBuffer.Bytes())
-	if err != nil {
+	if err = conn.Write(queryBuffer.Bytes()); err != nil {
+		this.pool.Put(connNode, true)
+		Logger.Error("write body fault", zap.Error(err))
 		return nil, err
 	}
 
-	th.recvHeader(conn)
-	if th.status != 0 {
-		logger.Warnf("recvHeader error [%d]", th.status)
-		return nil, Errno{int(th.status)}
-	}
-
-	var (
-		ipAddr         string
-		port           int64
-		storePathIndex uint8
-	)
-	recvBuff, _, err = TcpRecvResponse(conn, th.pkgLen)
-	if err != nil {
-		logger.Warnf("TcpRecvResponse error :%s", err.Error())
+	// response header
+	if h, err = conn.ReadHeader(); err != nil {
+		this.pool.Put(connNode, true)
+		Logger.Error("read header fault", zap.Error(err))
 		return nil, err
 	}
-	buff := bytes.NewBuffer(recvBuff)
+	if h.status != 0 {
+		this.pool.Put(connNode, false)
+		return nil, Errno{int(h.status)}
+	}
+
+	// response body
+	rspBuf, err := conn.ReadN(h.pkgLen)
+	if err != nil {
+		this.pool.Put(connNode, true)
+		Logger.Error("read body fault", zap.Error(err))
+		return nil, err
+	}
+	this.pool.Put(connNode, false)
+	svr := &StorageSvr{}
+	buff := bytes.NewBuffer(rspBuf)
 	// #recv_fmt |-group_name(16)-ipaddr(16-1)-port(8)-store_path_index(1)|
-	groupName, err = readCstr(buff, FDFS_GROUP_NAME_MAX_LEN)
-	ipAddr, err = readCstr(buff, IP_ADDRESS_SIZE-1)
-	binary.Read(buff, binary.BigEndian, &port)
-	binary.Read(buff, binary.BigEndian, &storePathIndex)
-	return &StorageServer{ipAddr, int(port), groupName, int(storePathIndex)}, nil
+	svr.groupName, err = readCstr(buff, FDFS_GROUP_NAME_MAX_LEN)
+	svr.ipAddr, err = readCstr(buff, IP_ADDRESS_SIZE-1)
+	binary.Read(buff, binary.BigEndian, &svr.port)
+	binary.Read(buff, binary.BigEndian, &svr.storePathIndex)
+	return svr, nil
 }

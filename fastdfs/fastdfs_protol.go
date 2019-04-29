@@ -3,8 +3,6 @@ package fastdfs
 import (
 	"bytes"
 	"encoding/binary"
-	"errors"
-	"io"
 	"os"
 )
 
@@ -113,71 +111,11 @@ const (
 	FDFS_STORAGE_STATUS_NONE       = 99
 )
 
-type Request interface {
-	marshal() ([]byte, error)
-}
-
-type Response interface {
-	unmarshal([]byte) error
-}
-
-type RequestResponse interface {
-	Request
-	Response
-}
-
-type StorageServer struct {
+type StorageSvr struct {
 	ipAddr         string
 	port           int
 	groupName      string
 	storePathIndex int
-}
-
-type trackerHeader struct {
-	cmd    int8
-	status int8
-	pkgLen int64
-}
-
-func (this *trackerHeader) marshal() ([]byte, error) {
-	buffer := new(bytes.Buffer)
-	binary.Write(buffer, binary.BigEndian, this.pkgLen)
-	buffer.WriteByte(byte(this.cmd))
-	buffer.WriteByte(byte(this.status))
-	return buffer.Bytes(), nil
-}
-
-func (this *trackerHeader) unmarshal(data []byte) error {
-	if len(data) != 10 {
-		return errors.New("data less than 10")
-	}
-	buff := bytes.NewBuffer(data)
-	binary.Read(buff, binary.BigEndian, &this.pkgLen)
-	cmd, _ := buff.ReadByte()
-	status, _ := buff.ReadByte()
-	this.cmd = int8(cmd)
-	this.status = int8(status)
-	return nil
-}
-
-func (this *trackerHeader) sendHeader(conn *ConnNode) (err error) {
-	buf, _ := this.marshal()
-	_, err = conn.c.Write(buf)
-	return
-}
-
-func (this *trackerHeader) recvHeader(conn *ConnNode) {
-	buf := make([]byte, 10)
-	_, err := io.ReadFull(conn.c, buf)
-	if err != nil {
-
-		return
-	}
-
-	err = this.unmarshal(buf)
-	if err != nil {
-		return
-	}
 }
 
 type uploadFileRequest struct {
@@ -186,7 +124,7 @@ type uploadFileRequest struct {
 	fileExtName    string
 }
 
-func (this *uploadFileRequest) marshal() ([]byte, error) {
+func (this *uploadFileRequest) marshal() []byte {
 	buffer := new(bytes.Buffer)
 	buffer.WriteByte(byte(this.storePathIndex))
 	binary.Write(buffer, binary.BigEndian, this.fileSize)
@@ -200,7 +138,7 @@ func (this *uploadFileRequest) marshal() ([]byte, error) {
 			buffer.WriteByte(fileExtNameBytes[i])
 		}
 	}
-	return buffer.Bytes(), nil
+	return buffer.Bytes()
 }
 
 type uploadSlaveFileRequest struct {
@@ -213,7 +151,7 @@ type uploadSlaveFileRequest struct {
 
 // #slave_fmt |-master_len(8)-file_size(8)-prefix_name(16)-file_ext_name(6)
 // #           -master_name(master_filename_len)-|
-func (this *uploadSlaveFileRequest) marshal() ([]byte, error) {
+func (this *uploadSlaveFileRequest) marshal() []byte {
 	buffer := new(bytes.Buffer)
 	binary.Write(buffer, binary.BigEndian, this.masterFilenameLen)
 	binary.Write(buffer, binary.BigEndian, this.fileSize)
@@ -243,16 +181,16 @@ func (this *uploadSlaveFileRequest) marshal() ([]byte, error) {
 	for i := 0; i < int(this.masterFilenameLen); i++ {
 		buffer.WriteByte(masterFilenameBytes[i])
 	}
-	return buffer.Bytes(), nil
+	return buffer.Bytes()
 }
 
-type UploadFileResponse struct {
+type UploadFileResp struct {
 	GroupName    string
 	RemoteFileId string
 }
 
 // recv_fmt: |-group_name(16)-remote_file_name(recv_size - 16)-|
-func (this *UploadFileResponse) unmarshal(data []byte) error {
+func (this *UploadFileResp) unmarshal(data []byte) error {
 	buff := bytes.NewBuffer(data)
 	var err error
 	this.GroupName, err = readCstr(buff, FDFS_GROUP_NAME_MAX_LEN)

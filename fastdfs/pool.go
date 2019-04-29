@@ -2,16 +2,15 @@ package fastdfs
 
 import (
 	"errors"
-	"net"
 	"sync"
 	"time"
 )
 
 var ErrPoolExhausted = errors.New("connection conn_pool exhausted")
 
-type DialFunc func() (net.Conn, error)
+type DialFunc func() (*conn, error)
 
-type TestFunc func(c net.Conn, t time.Time) error
+type TestFunc func(c *conn, t time.Time) error
 
 type Pool interface {
 	Get() (*ConnNode, error)
