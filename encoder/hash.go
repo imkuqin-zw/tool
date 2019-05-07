@@ -17,9 +17,9 @@ func Sha256(src string) (result string, err error) {
 	return
 }
 
-func Sha1(src string) (result string, err error) {
+func Sha1(src []byte) (result string, err error) {
 	hash := sha1.New()
-	_, err = hash.Write([]byte(src))
+	_, err = hash.Write(src)
 	if err != nil {
 		return
 	}
