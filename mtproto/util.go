@@ -42,3 +42,4 @@ func DeriveTmpAESKeyIV(newNonce []byte, serverNonce []byte) ([]byte, []byte) {
 
 	return key, iv
 }
+

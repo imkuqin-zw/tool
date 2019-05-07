@@ -1,14 +1,38 @@
 package mtproto
 
 import (
+	"bytes"
 	"crypto"
 	"crypto/rand"
 	"github.com/imkuqin-zw/tool/encoder"
+	"github.com/imkuqin-zw/tool/file"
+	"errors"
+	"io/ioutil"
+	"os"
 )
 
 type common struct {
 	ecdh      encoder.ECDH
 	RSAPubKey map[uint64]crypto.PublicKey
+}
+
+func newCommon(certPath string) (common, error) {
+	comm := common{
+		ecdh: encoder.NewCurve25519ECDH(),
+	}
+	if !file.IsDir(certPath) {
+		return comm, errors.New("rsa certificate path is not a directory")
+	}
+	files, err := file.GetAllFiles(certPath)
+	if err != nil {
+		return comm, err
+	}
+	for i := range files {
+		cert, err := ioutil.ReadFile(files[i])
+		os.
+		bytes.Split(cert, os.)
+	}
+
 }
 
 func (c *common) AESEncrypt(data, newNonce, serverNonce []byte) ([]byte, error) {
