@@ -52,6 +52,9 @@ func DeriveTmpAESKeyIV(newNonce []byte, serverNonce []byte) ([]byte, []byte) {
 }
 
 func GetAESPubKey(certPath string) (map[uint64]crypto.PublicKey, error) {
+	if !file.IsDir(certPath) {
+		return nil, errors.New("rsa certificate path is not a directory")
+	}
 	files, err := file.GetAllFiles(certPath)
 	if err != nil {
 		return nil, err
@@ -84,6 +87,9 @@ func GetAESPubKey(certPath string) (map[uint64]crypto.PublicKey, error) {
 }
 
 func GetAESCert(certPath string) (map[uint64]crypto.PublicKey, map[uint64]crypto.PrivateKey, error) {
+	if !file.IsDir(certPath) {
+		return nil, nil, errors.New("rsa certificate path is not a directory")
+	}
 	RSAPubKey, RSAPrivKey := make(map[uint64]crypto.PublicKey), make(map[uint64]crypto.PrivateKey)
 	files, err := file.GetAllFiles(certPath)
 	if err != nil {

@@ -10,6 +10,17 @@ type Server struct {
 	RSAPrivKey map[uint64]crypto.PrivateKey
 }
 
+func NewServer(certPath string) (*Server, error) {
+	var svr = &Server{}
+	svr.Ecdh = encoder.NewCurve25519ECDH()
+	var err error
+	svr.RSAPubKey, svr.RSAPrivKey, err = GetAESCert(certPath)
+	if err != nil {
+		return nil, err
+	}
+	return svr, nil
+}
+
 func (s *Server) CreateSvrNonce() [16]byte {
 	return RandInt128()
 }
