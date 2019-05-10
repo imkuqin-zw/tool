@@ -2,6 +2,7 @@ package mtproto
 
 import (
 	"github.com/imkuqin-zw/tool/encoder"
+	"math/rand"
 )
 
 type Client struct {
@@ -19,10 +20,14 @@ func NewClient(certPath string) (*Client, error) {
 	return cli, nil
 }
 
-func (c *Client) CreateNewNonce() [32]byte {
+func (c *Client) GenNewNonce() [32]byte {
 	return RandInt256()
 }
 
 func (s *Client) GenMsgKey(authKey, data []byte) []byte {
 	return s.genMsgKey(authKey, data, 0)
+}
+
+func (s *Client) ChoiceRsaKey(fingers []uint64) uint64 {
+	return fingers[rand.Intn(len(fingers))]
 }
