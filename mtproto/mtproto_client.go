@@ -1,8 +1,6 @@
 package mtproto
 
 import (
-	"bytes"
-	"crypto/sha256"
 	"github.com/imkuqin-zw/tool/encoder"
 )
 
@@ -25,14 +23,6 @@ func (c *Client) CreateNewNonce() [32]byte {
 	return RandInt256()
 }
 
-//auth_key为第1024直接
-func (c *Client) GetMsgKey(authKey, data []byte) []byte {
-	buf := bytes.NewBuffer(authKey[88:120])
-	buf.Write(data)
-	tmp := sha256.Sum256(buf.Bytes())
-	return tmp[8:24]
-}
-
-func (c *Client) GetAesKeyIv(auth_key, msgKey) {
-
+func (s *Client) GenMsgKey(authKey, data []byte) []byte {
+	return s.genMsgKey(authKey, data, 0)
 }

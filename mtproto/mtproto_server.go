@@ -28,3 +28,7 @@ func (s *Server) CreateSvrNonce() [16]byte {
 func (s *Server) RsaDecrypt(finger uint64, data []byte) ([]byte, error) {
 	return encoder.RsaDecrypt(data, s.RSAPrivKey[finger].([]byte))
 }
+
+func (s *Server) GenMsgKey(authKey, data []byte) []byte {
+	return s.genMsgKey(authKey, data, 8)
+}

@@ -2,13 +2,14 @@ package encoder
 
 import (
 	"crypto"
+	"crypto/elliptic"
 	"crypto/rand"
 	"fmt"
 	"testing"
 )
 
 func Test_ECDH(t *testing.T) {
-	e := NewCurve25519ECDH()
+	e := NewEllipticECDH(elliptic.P521())
 	var privKey1, privKey2 crypto.PrivateKey
 	var pubKey1, pubKey2 crypto.PublicKey
 	var pubKey1Buf, pubKey2Buf []byte
