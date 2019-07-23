@@ -49,7 +49,7 @@ func (c *common) AESTmpDecrypt(data, newNonce, serverNonce []byte) ([]byte, erro
 	return encoder.AESCBCDecrypt(data, key, iv)
 }
 
-func (c *common) GenECDHKey() (crypto.PublicKey, crypto.PublicKey) {
+func (c *common) GenECDHKey() (crypto.PublicKey, crypto.PrivateKey) {
 	pubKey, prvKey, _ := c.Ecdh.GenerateKey(rand.Reader)
 	return pubKey, prvKey
 }
