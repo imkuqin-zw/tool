@@ -30,20 +30,6 @@ type CliVar struct {
 	useFinger  uint64
 }
 
-type ReqECDHParams struct {
-	Finger        uint64
-	CliNonce      []byte
-	SvrNonce      []byte
-	EncryptedData []byte
-}
-
-type EncryptedData struct {
-	NewNonce []byte
-	CliNonce []byte
-	SvrNonce []byte
-	pubKey   []byte
-}
-
 func main() {
 	var err error
 	protoCli, err = mtproto.NewClient("")
@@ -58,6 +44,8 @@ func main() {
 	}
 	go cliReadConn()
 	reqPqMulti()
+	reqECDH()
+	ChangeDH()
 }
 
 func cliSendConn(cmd uint32, data []byte) {
@@ -106,9 +94,21 @@ func reqPqMulti() {
 	return
 }
 
+type ReqECDHParams struct {
+	Finger        uint64
+	CliNonce      []byte
+	SvrNonce      []byte
+	EncryptedData []byte
+}
+
+type EncryptedData struct {
+	NewNonce []byte
+	CliNonce []byte
+	SvrNonce []byte
+}
+
 func reqECDH() {
 	var err error
-	cliVar.cliPubKey, cliVar.cliPrivKey = protoCli.GenECDHKey()
 	newNonce := protoCli.GenNewNonce()
 	cliVar.newNonce = newNonce[:]
 	cliVar.useFinger = protoCli.ChoiceRsaKey(cliVar.fingers)
@@ -121,7 +121,6 @@ func reqECDH() {
 		NewNonce: newNonce[:],
 		CliNonce: cliVar.cliNonce,
 		SvrNonce: cliVar.svrNonce,
-		pubKey:   cliVar.cliPubKey.([]byte),
 	}
 	encrypData, _ := json.Marshal(encryptedData)
 	params.EncryptedData, err = protoCli.RsaEncrypt(cliVar.useFinger, protoCli.GetDataWithHash(encrypData))
@@ -159,4 +158,40 @@ func reqECDH() {
 		return
 	}
 	cliVar.svrPubKey = encryData.Pubkey
+}
+
+type ReqChangeDH struct {
+	CliNonce      []byte
+	SvrNonce      []byte
+	EncryptedData []byte
+}
+
+type ChangeDHEncry struct {
+	CliNonce []byte
+	SvrNonce []byte
+	RetryId  uint64
+	pubKey   []byte
+}
+
+func ChangeDH() {
+	cliVar.cliPubKey, cliVar.cliPrivKey = protoCli.GenECDHKey()
+	encry := &ChangeDHEncry{
+		CliNonce: cliVar.cliNonce,
+		SvrNonce: cliVar.svrNonce,
+		pubKey: cliVar.cliPubKey.([]byte),
+	}
+	req := ReqChangeDH{
+		CliNonce: cliVar.cliNonce,
+		SvrNonce: cliVar.svrNonce,
+	}
+	req.EncryptedData, _ = json.Marshal(encry)
+	data, _ := json.Marshal(req)
+	sendData, err := protoCli.AESTmpEncrypt(protoCli.GetDataWithHash(data), cliVar.newNonce, cliVar.svrNonce)
+	if err != nil {
+		log.Fatal(err.Error())
+		return
+	}
+	cliSendConn(3, sendData)
+	rsp := <-cliRead
+	rspData := rsp[4:]
 }

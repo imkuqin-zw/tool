@@ -47,6 +47,11 @@ type ResPqMulti struct {
 	Finger []uint64
 }
 
+type ResChangeDH struct {
+	CliNonce []byte
+	SvrNonce []byte
+}
+
 func main() {
 	var err error
 	protoSvr, err = mtproto.NewServer("")
@@ -146,6 +151,7 @@ func handel() {
 			case 2:
 				reqECDHHandle(data)
 			case 3:
+				ChangeDHHandle(data)
 			default:
 				log.Println("cmd not found", cmd)
 			}
@@ -210,12 +216,48 @@ func reqECDHHandle(req []byte) {
 		SvrNonce: svrVar.svrNonce,
 	}
 	var err error
-
 	spt.Encrypt, err = protoSvr.AESTmpEncrypt(hashData, svrVar.newNonce, svrVar.svrNonce)
 	if err != nil {
 		log.Fatal(err.Error())
 		return
 	}
 	data, _ = json.Marshal(spt)
+	sendData(append(req[:4], data...))
+}
+
+func ChangeDHHandle(req []byte) {
+	params := &ReqECDHParams{}
+	_ = json.Unmarshal(req[4:], params)
+	if 0 != bytes.Compare(params.SvrNonce, svrVar.svrNonce) {
+		log.Fatal("svr nonce not equal")
+		return
+	}
+	if 0 != bytes.Compare(params.CliNonce, svrVar.cliNonce) {
+		log.Fatal("cli nonce not equal")
+		return
+	}
+	encryData, _ := protoSvr.AESTmpDecrypt(req[4:], svrVar.newNonce, svrVar.svrNonce)
+	if !protoSvr.CheckHash(encryData) {
+		log.Fatal("hash not equal")
+		return
+	}
+	encryptedData := &ChangeDHEncry{}
+	_ = json.Unmarshal(protoSvr.RemoveHash(encryData), encryptedData)
+	if 0 != bytes.Compare(encryptedData.SvrNonce, svrVar.svrNonce) {
+		log.Fatal("svr nonce not equal")
+		return
+	}
+	if 0 != bytes.Compare(encryptedData.CliNonce, svrVar.cliNonce) {
+		log.Fatal("cli nonce not equal")
+		return
+	}
+	svrVar.cliPubKey = encryptedData.pubKey
+	svrVar.authKey = protoSvr.GenSharedKey(svrVar.svrPrivKey, svrVar.cliPubKey)
+
+	spt := &ResChangeDH{
+		CliNonce: svrVar.cliNonce,
+		SvrNonce: svrVar.svrNonce,
+	}
+	data, _ := json.Marshal(spt)
 	sendData(append(req[:4], data...))
 }
