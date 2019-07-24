@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"context"
+	"crypto"
 	"encoding/binary"
 	"encoding/json"
 	"github.com/imkuqin-zw/tool/mtproto"
@@ -20,7 +21,25 @@ var (
 )
 
 type SvrVar struct {
-	cliNonce []byte
+	cliNonce   []byte
+	svrNonce   []byte
+	newNonce   []byte
+	cliPubKey  crypto.PublicKey
+	svrPubKey  crypto.PublicKey
+	svrPrivKey crypto.PrivateKey
+	authKey    []byte
+}
+
+type ResECDHEncrypt struct {
+	CliNonce []byte
+	SvrNonce []byte
+	Pubkey   []byte
+}
+
+type ResECDH struct {
+	CliNonce []byte
+	SvrNonce []byte
+	Encrypt  []byte
 }
 
 type ResPqMulti struct {
@@ -125,6 +144,7 @@ func handel() {
 			case 1:
 				reqPqMultiHandle(data)
 			case 2:
+				reqECDHHandle(data)
 			case 3:
 			default:
 				log.Println("cmd not found", cmd)
@@ -137,12 +157,65 @@ func handel() {
 }
 
 func reqPqMultiHandle(req []byte) {
-	svrVar.cliNonce = req[:4]
+	svrVar.cliNonce = req[4:]
 	nonce := protoSvr.GenNonce128()
+	svrVar.svrNonce = nonce[:]
 	res := ResPqMulti{
 		Nonce:  nonce[:],
 		Finger: protoSvr.GetRsaKeyFingers(),
 	}
 	data, _ := json.Marshal(res)
+	sendData(append(req[:4], data...))
+}
+
+func reqECDHHandle(req []byte) {
+	params := &ReqECDHParams{}
+	_ = json.Unmarshal(req[4:], params)
+	if 0 != bytes.Compare(params.SvrNonce, svrVar.svrNonce) {
+		log.Fatal("svr nonce not equal")
+		return
+	}
+	if 0 != bytes.Compare(params.CliNonce, svrVar.cliNonce) {
+		log.Fatal("cli nonce not equal")
+		return
+	}
+	encryData, _ := protoSvr.RsaDecrypt(params.Finger, params.EncryptedData)
+	if !protoSvr.CheckHash(encryData) {
+		log.Fatal("hash not equal")
+		return
+	}
+	encryptedData := &EncryptedData{}
+	_ = json.Unmarshal(protoSvr.RemoveHash(encryData), encryptedData)
+	if 0 != bytes.Compare(encryptedData.SvrNonce, svrVar.svrNonce) {
+		log.Fatal("svr nonce not equal")
+		return
+	}
+	if 0 != bytes.Compare(encryptedData.CliNonce, svrVar.cliNonce) {
+		log.Fatal("cli nonce not equal")
+		return
+	}
+	svrVar.newNonce = encryptedData.NewNonce
+	svrVar.svrPubKey, svrVar.svrPrivKey = protoSvr.GenECDHKey()
+	svrVar.cliPubKey = encryptedData.pubKey
+	//authKey := protoSvr.GenSharedKey(svrVar.svrPrivKey, svrVar.cliPubKey)
+	res := &ResECDHEncrypt{
+		CliNonce: svrVar.cliNonce,
+		SvrNonce: svrVar.svrNonce,
+		Pubkey:   svrVar.svrPubKey.([]byte),
+	}
+	data, _ := json.Marshal(res)
+	hashData := protoSvr.GetDataWithHash(data)
+	spt := &ResECDH{
+		CliNonce: svrVar.cliNonce,
+		SvrNonce: svrVar.svrNonce,
+	}
+	var err error
+
+	spt.Encrypt, err = protoSvr.AESTmpEncrypt(hashData, svrVar.newNonce, svrVar.svrNonce)
+	if err != nil {
+		log.Fatal(err.Error())
+		return
+	}
+	data, _ = json.Marshal(spt)
 	sendData(append(req[:4], data...))
 }

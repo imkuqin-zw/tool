@@ -111,3 +111,22 @@ func (c *common) genMsgKey(authKey, data []byte, x int) []byte {
 	tmp := sha256.Sum256(buf.Bytes())
 	return tmp[8:24]
 }
+
+func (c *common) Sha1(data []byte) []byte {
+	hash := sha1.New()
+	hash.Write(data)
+	return hash.Sum(nil)
+}
+
+// SHA1（数据）+ 数据
+func (c *common) GetDataWithHash(data []byte) []byte {
+	return append(c.Sha1(data), data...)
+}
+
+func (c *common) CheckHash(data []byte) bool {
+	return 0 == bytes.Compare(c.Sha1(data[20:]), data[:20])
+}
+
+func (c *common) RemoveHash(data []byte) []byte {
+	return data[20:]
+}

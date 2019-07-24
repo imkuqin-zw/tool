@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"crypto"
 	"encoding/binary"
 	"encoding/json"
 	"github.com/imkuqin-zw/tool/mtproto"
@@ -19,12 +20,28 @@ var (
 )
 
 type CliVar struct {
-	cliNonce []byte
-	fingers  []uint64
+	cliNonce   []byte
+	svrNonce   []byte
+	fingers    []uint64
+	cliPrivKey crypto.PrivateKey
+	cliPubKey  crypto.PublicKey
+	svrPubKey  crypto.PublicKey
+	newNonce   []byte
+	useFinger  uint64
 }
 
-type reqECDHParams struct {
+type ReqECDHParams struct {
+	Finger        uint64
+	CliNonce      []byte
+	SvrNonce      []byte
+	EncryptedData []byte
+}
+
+type EncryptedData struct {
+	NewNonce []byte
 	CliNonce []byte
+	SvrNonce []byte
+	pubKey   []byte
 }
 
 func main() {
@@ -41,6 +58,21 @@ func main() {
 	}
 	go cliReadConn()
 	reqPqMulti()
+}
+
+func cliSendConn(cmd uint32, data []byte) {
+	crcId := make([]byte, 0, 4)
+	binary.BigEndian.PutUint32(crcId, cmd)
+	data = append(crcId, data...)
+	dataLen := make([]byte, 0, 4)
+	binary.BigEndian.PutUint32(dataLen, uint32(len(data)))
+	buf := bytes.NewBuffer(dataLen)
+	buf.Write(data)
+	_, err := conn.Write(buf.Bytes())
+	if err != nil {
+		log.Fatal(err.Error())
+		return
+	}
 }
 
 func cliReadConn() {
@@ -60,30 +92,71 @@ func cliReadConn() {
 
 func reqPqMulti() {
 	nonce := protoCli.GenNonce128()
-	crcId := make([]byte, 0, 4)
-	binary.BigEndian.PutUint32(crcId, 1)
-	data := append(crcId, nonce[:]...)
-	dataLen := make([]byte, 0, 4)
-	binary.BigEndian.PutUint32(dataLen, uint32(len(data)))
-	buf := bytes.NewBuffer(dataLen)
-	buf.Write(data)
-	_, err := conn.Write(buf.Bytes())
-	if err != nil {
-		log.Fatal(err.Error())
-		return
-	}
+	cliSendConn(1, nonce[:])
 	rsp := <-cliRead
-	data = rsp[4:]
+	data := rsp[4:]
 	res := &ResPqMulti{}
-	if err = json.Unmarshal(data, res); err != nil {
+	if err := json.Unmarshal(data, res); err != nil {
 		log.Fatal(err.Error())
 		return
 	}
-	cliVar.cliNonce = res.Nonce
+	cliVar.svrNonce = res.Nonce
+	cliVar.cliNonce = nonce[:]
 	cliVar.fingers = res.Finger
 	return
 }
 
 func reqECDH() {
-	pubKey, privKey := protoCli.GenECDHKey()
+	var err error
+	cliVar.cliPubKey, cliVar.cliPrivKey = protoCli.GenECDHKey()
+	newNonce := protoCli.GenNewNonce()
+	cliVar.newNonce = newNonce[:]
+	cliVar.useFinger = protoCli.ChoiceRsaKey(cliVar.fingers)
+	params := &ReqECDHParams{
+		Finger:   cliVar.useFinger,
+		CliNonce: cliVar.cliNonce,
+		SvrNonce: cliVar.svrNonce,
+	}
+	encryptedData := &EncryptedData{
+		NewNonce: newNonce[:],
+		CliNonce: cliVar.cliNonce,
+		SvrNonce: cliVar.svrNonce,
+		pubKey:   cliVar.cliPubKey.([]byte),
+	}
+	encrypData, _ := json.Marshal(encryptedData)
+	params.EncryptedData, err = protoCli.RsaEncrypt(cliVar.useFinger, protoCli.GetDataWithHash(encrypData))
+	if err != nil {
+		log.Fatal(err.Error())
+		return
+	}
+	sendData, _ := json.Marshal(params)
+	cliSendConn(2, sendData)
+	rsp := <-cliRead
+	rspData := rsp[4:]
+	res := &ResECDH{}
+	_ = json.Unmarshal(rspData, res)
+	if bytes.Compare(res.SvrNonce, cliVar.svrNonce) != 0 {
+		log.Fatal("svr nonce not equal")
+		return
+	}
+	if bytes.Compare(res.CliNonce, cliVar.cliNonce) != 0 {
+		log.Fatal("cli nonce not equal")
+		return
+	}
+	data, err := protoCli.AESTmpDecrypt(res.Encrypt, cliVar.newNonce, cliVar.svrNonce)
+	if err != nil {
+		log.Fatal(err.Error())
+		return
+	}
+	encryData := &ResECDHEncrypt{}
+	_ = json.Unmarshal(data, encryData)
+	if bytes.Compare(res.SvrNonce, cliVar.svrNonce) != 0 {
+		log.Fatal("svr nonce not equal")
+		return
+	}
+	if bytes.Compare(res.CliNonce, cliVar.cliNonce) != 0 {
+		log.Fatal("cli nonce not equal")
+		return
+	}
+	cliVar.svrPubKey = encryData.Pubkey
 }
