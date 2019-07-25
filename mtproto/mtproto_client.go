@@ -12,6 +12,7 @@ type Client struct {
 func NewClient(certPath string) (*Client, error) {
 	var cli = &Client{}
 	cli.Ecdh = encoder.NewCurve25519ECDH()
+	//cli.Ecdh = encoder.NewEllipticECDH(elliptic.P521())
 	var err error
 	cli.RSAPubKey, err = GetAESPubKey(certPath)
 	if err != nil {

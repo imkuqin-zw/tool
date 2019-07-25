@@ -50,7 +50,7 @@ func (c *common) AESTmpDecrypt(data, newNonce, serverNonce []byte) ([]byte, erro
 }
 
 func (c *common) GenECDHKey() (crypto.PublicKey, crypto.PrivateKey) {
-	pubKey, prvKey, _ := c.Ecdh.GenerateKey(rand.Reader)
+	prvKey, pubKey, _ := c.Ecdh.GenerateKey(rand.Reader)
 	return pubKey, prvKey
 }
 
@@ -62,7 +62,7 @@ func (c *common) GenNonce128() [16]byte {
 	return RandInt128()
 }
 
-func (c *common) GenSharedKey(privKey crypto.PrivateKey, pubKey crypto.PublicKey) []byte {
+func (c *common) GenAuthKey(privKey crypto.PrivateKey, pubKey crypto.PublicKey) []byte {
 	secret, _ := c.Ecdh.GenerateSharedSecret(privKey, pubKey)
 	return secret
 }
@@ -112,21 +112,36 @@ func (c *common) genMsgKey(authKey, data []byte, x int) []byte {
 	return tmp[8:24]
 }
 
-func (c *common) Sha1(data []byte) []byte {
-	hash := sha1.New()
-	hash.Write(data)
-	return hash.Sum(nil)
-}
+//func (c *common) Sha1(data []byte) []byte {
+//	hash := sha1.New()
+//	hash.Write(data)
+//	return hash.Sum(nil)
+//}
 
 // SHA1（数据）+ 数据
 func (c *common) GetDataWithHash(data []byte) []byte {
-	return append(c.Sha1(data), data...)
+	hash := sha1.Sum(data)
+	return append(hash[:], data...)
 }
 
 func (c *common) CheckHash(data []byte) bool {
-	return 0 == bytes.Compare(c.Sha1(data[20:]), data[:20])
+	hash := sha1.Sum(data[20:])
+	return 0 == bytes.Compare(hash[:], data[:20])
 }
 
 func (c *common) RemoveHash(data []byte) []byte {
 	return data[20:]
+}
+
+func (s *common) GetAuthKeyAuxHash(authKey []byte) []byte {
+	hash := sha1.Sum(authKey)
+	return hash[:8]
+}
+
+func (s *common) GetNewNonceHash1(newNonce, authKey []byte) []byte {
+	buf := bytes.NewBuffer(newNonce)
+	buf.Write([]byte{1})
+	buf.Write(s.GetAuthKeyAuxHash(authKey))
+	hash := sha1.Sum(buf.Bytes())
+	return hash[4:]
 }

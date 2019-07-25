@@ -14,6 +14,7 @@ type Server struct {
 func NewServer(certPath string) (*Server, error) {
 	var svr = &Server{}
 	svr.Ecdh = encoder.NewCurve25519ECDH()
+	//svr.Ecdh = encoder.NewEllipticECDH(elliptic.P521())
 	var err error
 	svr.fingers, svr.RSAPubKey, svr.RSAPrivKey, err = GetAESCert(certPath)
 	if err != nil {

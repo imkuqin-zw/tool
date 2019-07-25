@@ -1,25 +1,20 @@
 package mtproto
 
 import (
+	"fmt"
 	"testing"
 )
 
 func Test_MTProto(t *testing.T) {
-	//var (
-	//	cliNonce [16]byte
-	//	fingers []uint64
-	//	cliFinger uint64
-	//	cliNewNonce
-	//)
-	//
-	//assert := assert.New(t)
-	//cli, err := NewClient("./rsa_cert")
-	//assert.NoError(err)
-	//svr, err := NewServer("./rsa_cert")
-	//assert.NoError(err)
-	//
-	//cliNonce = cli.GenNonce128()
-	//fingers = svr.GetRsaKeyFingers()
-	//cliFinger = cli.ChoiceRsaKey(fingers)
-	//cli.GenNewNonce()
+	data, _ := GetAESPubKey("./rsa_cli")
+	for i, item := range data {
+		fmt.Println(i)
+		fmt.Println(string(item.([]byte)))
+	}
+	fmt.Println("-----------------------------------------")
+	_, pubkey, _, _ := GetAESCert("./rsa_cert")
+	for i, item := range pubkey {
+		fmt.Println(i)
+		fmt.Println(string(item.([]byte)))
+	}
 }

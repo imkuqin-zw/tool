@@ -1,7 +1,6 @@
 package mtproto
 
 import (
-	"bufio"
 	"bytes"
 	"crypto"
 	"crypto/rand"
@@ -40,23 +39,11 @@ func GetAESPubKey(certPath string) (map[uint64]crypto.PublicKey, error) {
 		if err != nil {
 			return nil, err
 		}
-		r := bufio.NewReader(f)
-		buf := bytes.NewBuffer([]byte{})
-		for {
-			line, _, err := r.ReadLine()
-			if err != nil {
-				return nil, err
-			}
-			if line == nil {
-				break
-			}
-			if _, err = buf.Write(line); err != nil {
-				return nil, err
-			}
-		}
-		pubKey := buf.Bytes()
+		pubKey, err := ioutil.ReadAll(f)
 		pubKeySha1 := sha1.Sum(pubKey)
-		RSAPubKey[binary.BigEndian.Uint64(pubKeySha1[12:])] = pubKey
+		finger := binary.BigEndian.Uint64(pubKeySha1[12:])
+		RSAPubKey[finger] = pubKey
+		break
 	}
 	return RSAPubKey, nil
 }
@@ -84,14 +71,16 @@ func GetAESCert(certPath string) ([]uint64, map[uint64]crypto.PublicKey, map[uin
 		if err != nil {
 			return nil, nil, nil, err
 		}
-		key := bytes.Split(cert, []byte{'\n', '\n'})
+
+		key := bytes.Split(cert, []byte{'#', '#', '#', '#'})
 		if len(key) != 2 {
 			return nil, nil, nil, errors.New("ase certificate format wrong")
 		}
-		pubKeySha1 := sha1.Sum(key[2])
+		pubKeySha1 := sha1.Sum(key[0])
 		finger := binary.BigEndian.Uint64(pubKeySha1[12:])
-		RSAPubKey[finger], RSAPrivKey[finger] = key[1], key[2]
+		RSAPubKey[finger], RSAPrivKey[finger] = key[0], key[1]
 		fingerArr = append(fingerArr, finger)
+		break
 	}
 	return fingerArr, RSAPubKey, RSAPrivKey, nil
 }
