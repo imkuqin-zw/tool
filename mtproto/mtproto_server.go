@@ -6,8 +6,8 @@ import (
 )
 
 type Server struct {
-	fingers []uint64
 	common
+	fingers []uint64
 	RSAPrivKey map[uint64]crypto.PrivateKey
 }
 
@@ -37,4 +37,8 @@ func (s *Server) RsaDecrypt(finger uint64, data []byte) ([]byte, error) {
 
 func (s *Server) GenMsgKey(authKey, data []byte) []byte {
 	return s.genMsgKey(authKey, data, 8)
+}
+
+func (s *Server) GetInitSalt(newNonce, svrNonce []byte) []byte {
+	return append(newNonce[:8], svrNonce[:8]...)
 }

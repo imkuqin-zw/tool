@@ -236,7 +236,7 @@ func ChangeDHHandle(req []byte) {
 	spt := &ResChangeDH{
 		CliNonce:  svrVar.cliNonce,
 		SvrNonce:  svrVar.svrNonce,
-		NonceHash: protoSvr.GetNewNonceHash1(svrVar.newNonce, svrVar.authKey),
+		NonceHash: protoSvr.GetNewNonceHash(svrVar.newNonce, svrVar.authKey, mtproto.AuthKeyGenOk),
 	}
 	data, _ := json.Marshal(spt)
 	sendData(append(req[:4], data...))

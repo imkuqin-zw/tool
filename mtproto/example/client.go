@@ -186,7 +186,7 @@ func ChangeDH() {
 		return
 	}
 	cliVar.authKey = protoCli.GenAuthKey(cliVar.cliPrivKey, cliVar.svrPubKey)
-	nonceHash := protoCli.GetNewNonceHash1(cliVar.newNonce, cliVar.authKey)
+	nonceHash := protoCli.GetNewNonceHash(cliVar.newNonce, cliVar.authKey, mtproto.AuthKeyGenOk)
 	if !bytes.Contains(res.NonceHash, nonceHash) {
 		log.Fatal("new nonce hash not equal")
 		return

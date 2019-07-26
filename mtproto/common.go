@@ -9,6 +9,12 @@ import (
 	"github.com/imkuqin-zw/tool/encoder"
 )
 
+const (
+	AuthKeyGenOk    = 1
+	AuthKeyGenRetry = 2
+	AuthKeyGenFail  = 3
+)
+
 type common struct {
 	Ecdh      encoder.ECDH
 	RSAPubKey map[uint64]crypto.PublicKey
@@ -112,12 +118,6 @@ func (c *common) genMsgKey(authKey, data []byte, x int) []byte {
 	return tmp[8:24]
 }
 
-//func (c *common) Sha1(data []byte) []byte {
-//	hash := sha1.New()
-//	hash.Write(data)
-//	return hash.Sum(nil)
-//}
-
 // SHA1（数据）+ 数据
 func (c *common) GetDataWithHash(data []byte) []byte {
 	hash := sha1.Sum(data)
@@ -138,9 +138,9 @@ func (s *common) GetAuthKeyAuxHash(authKey []byte) []byte {
 	return hash[:8]
 }
 
-func (s *common) GetNewNonceHash1(newNonce, authKey []byte) []byte {
+func (s *common) GetNewNonceHash(newNonce, authKey []byte, i int8) []byte {
 	buf := bytes.NewBuffer(newNonce)
-	buf.Write([]byte{1})
+	buf.WriteByte(byte(i))
 	buf.Write(s.GetAuthKeyAuxHash(authKey))
 	hash := sha1.Sum(buf.Bytes())
 	return hash[4:]
