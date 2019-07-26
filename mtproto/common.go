@@ -3,10 +3,11 @@ package mtproto
 import (
 	"bytes"
 	"crypto"
-	"crypto/rand"
 	"crypto/sha1"
 	"crypto/sha256"
 	"github.com/imkuqin-zw/tool/encoder"
+	"math/rand"
+	"time"
 )
 
 const (
@@ -133,15 +134,20 @@ func (c *common) RemoveHash(data []byte) []byte {
 	return data[20:]
 }
 
-func (s *common) GetAuthKeyAuxHash(authKey []byte) []byte {
+func (c *common) GetAuthKeyAuxHash(authKey []byte) []byte {
 	hash := sha1.Sum(authKey)
 	return hash[:8]
 }
 
-func (s *common) GetNewNonceHash(newNonce, authKey []byte, i int8) []byte {
+func (c *common) GetNewNonceHash(newNonce, authKey []byte, i int8) []byte {
 	buf := bytes.NewBuffer(newNonce)
 	buf.WriteByte(byte(i))
-	buf.Write(s.GetAuthKeyAuxHash(authKey))
+	buf.Write(c.GetAuthKeyAuxHash(authKey))
 	hash := sha1.Sum(buf.Bytes())
 	return hash[4:]
+}
+
+func (c *common) GenSalt() int64 {
+	r := rand.New(rand.NewSource(time.Now().Unix()))
+	return r.Int63()
 }
