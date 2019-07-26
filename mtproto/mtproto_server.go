@@ -7,7 +7,7 @@ import (
 
 type Server struct {
 	common
-	fingers []uint64
+	fingers    []uint64
 	RSAPrivKey map[uint64]crypto.PrivateKey
 }
 
@@ -41,4 +41,14 @@ func (s *Server) GenMsgKey(authKey, data []byte) []byte {
 
 func (s *Server) GetInitSalt(newNonce, svrNonce []byte) []byte {
 	return append(newNonce[:8], svrNonce[:8]...)
+}
+
+func (s *Server) AESEncrypt(authKey, msgKey, data []byte) ([]byte, error) {
+	key, iv := s.genAesKeyIv(authKey, msgKey, 8)
+	return encoder.AESCBCEncrypt(data, key, iv)
+}
+
+func (s *Server) AESDecrypt(authKey, msgKey, data []byte) ([]byte, error) {
+	key, iv := s.genAesKeyIv(authKey, msgKey, 0)
+	return encoder.AESCBCDecrypt(data, key, iv)
 }
