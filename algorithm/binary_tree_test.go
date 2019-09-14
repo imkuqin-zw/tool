@@ -6,10 +6,10 @@ import (
 )
 
 func TestBTree_BuildBTree(t *testing.T) {
-	bt := NewTree()
-	//nodeArr := make([]BTreeArrNode, 0)
+	// bt := NewTree()
+	// nodeArr := make([]BTreeArrNode, 0)
 
-	//bt.BuildBTree()
+	// bt.BuildBTree()
 }
 
 func TestBTree_Traversal(t *testing.T) {
