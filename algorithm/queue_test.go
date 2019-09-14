@@ -42,7 +42,4 @@ func TestQueue(t *testing.T) {
 	TestQueue_Length(t)
 	TestQueue_Pop(t)
 	TestQueue_IsEmpty(t)
-
-
-	
 }

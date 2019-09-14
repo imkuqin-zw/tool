@@ -10,8 +10,6 @@ func TestBTree_BuildBTree(t *testing.T) {
 	// nodeArr := make([]BTreeArrNode, 0)
 
 	// bt.BuildBTree()
-
-	
 }
 
 func TestBTree_Traversal(t *testing.T) {
